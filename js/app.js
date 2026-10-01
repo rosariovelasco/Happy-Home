@@ -362,6 +362,7 @@ function formHTML(){
 }
 function bindForm(){
   const map={f_ret:'ret',f_prov:'prov',f_obra:'obra',f_doc:'doc',f_ndoc:'ndoc',f_monto:'monto',f_medio:'medio',f_fecha:'fecha',f_socio:'socio',f_int:'interes',f_cuenta:'cuenta',f_llego:'llego',f_det:'detalle',f_liga:'liga'};
+  const fpv=document.getElementById('f_prov'); if(fpv&&!EDIT) fpv.addEventListener('change',()=>{const k=nrm(fpv.value.trim()); if(!k) return; const u=D.movs.find(m=>m.tipo==='egreso'&&nrm(m.quien||'')===k&&m.quien!=='SII · retención honorarios'); if(u){ if(u.doc&&u.doc!==F.doc){F.doc=u.doc;} if(['pago','socio'].includes(F.tipo)&&!F.cuenta) F.cuenta=u.cuenta; formHTML(); toast('Documento y cuenta de la última vez: '+u.doc+' · '+u.cuenta);}});
   const fd=document.getElementById('f_doc'); if(fd) fd.addEventListener('change',()=>{F.doc=fd.value; formHTML();});
   const pg=document.getElementById('f_pag'); if(pg) pg.addEventListener('input',()=>{F.pagado=pg.value==='1'; effects();});
   const lg=document.getElementById('f_liga'); if(lg) lg.addEventListener('change',()=>{const m=movById(lg.value); if(m){F.monto=String(m.total); F.socio=/max/i.test(m.quien)?'Max':'Rosario'; formHTML();}});
@@ -519,7 +520,7 @@ let EDIT=null;
 function editarMov(id){
   const m=movById(id); if(!m) return; EDIT=id;
   const o=obraDe(m);
-  F={...F,socio:/max/i.test(m.quien||'')?'Max':'Rosario',tipo:m.medio==='Cuenta personal socio'&&m.tipo==='egreso'?'socio':(m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso')?'reembsocio':TIPO_DE[m.nat]||(m.cuenta==='Retiro de socio'?'retiro':m.cuenta==='Pago F29 (IVA)'?'f29':m.cuenta==='Cuota de crédito'?'cuota':'traspaso'),prov:m.quien||'',obra:o?o.id:'',doc:m.doc==='Nada'||m.doc==='Factura'||m.doc==='Boleta'?m.doc:'Factura',ndoc:m.ndoc||'',monto:String(m.total),fecha:m.fecha||HOY,cuenta:F.tipo==='pago'?'':'',pagado:m.pagado,llego:'',medio:m.medio||F.medio,detalle:m.detalle||'',liga:m.liga||''};
+  F={...F,socio:/max/i.test(m.quien||'')?'Max':'Rosario',tipo:m.medio==='Cuenta personal socio'&&m.tipo==='egreso'?'socio':(m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso')?'reembsocio':TIPO_DE[m.nat]||(m.cuenta==='Retiro de socio'?'retiro':m.cuenta==='Pago F29 (IVA)'?'f29':m.cuenta==='Cuota de crédito'?'cuota':'traspaso'),prov:m.quien||'',obra:o?o.id:'',doc:['Nada','Factura','Boleta','Boleta de honorarios'].includes(m.doc)?m.doc:'Nada',ret:'hh',ndoc:m.ndoc||'',monto:String(m.total),fecha:m.fecha||HOY,cuenta:F.tipo==='pago'?'':'',pagado:m.pagado,llego:'',medio:m.medio||F.medio,detalle:m.detalle||'',liga:m.liga||''};
   if(['pago','socio'].includes(F.tipo)) F.cuenta=m.cuenta;
   $('#dlg').close(); show('nuevo');
 }
