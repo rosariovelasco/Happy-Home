@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610011457';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011457';
+import * as api from './api.js?v=202610011502';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011502';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -682,7 +682,7 @@ V.reparto=()=>{
   const sueldoSost=Math.max(0,Math.round(generadoHH/nm));
   return `<div>${backBtn}<h1>Reparto del mes</h1><p class="sub">Cuánto se puede repartir de cada obra en curso sin dejarla sin plata, y cuánto puede sacar Happy Home. Montos de plata con IVA; el cálculo por obra es sin IVA para que cuadre con el margen.</p></div>
   <section class="card"><div class="grid g4">
-   <div class="kpi"><span>Transferir a Casa Construcción</span><b>${clp(Math.min(totCCiva,Math.max(0,paraCC)))}</b><small>con IVA · según las obras: ${clp(totCCiva)}</small></div>
+   <div class="kpi"><span>Transferir a Casa Construcción</span><b>${clp(totCCiva)}</b><small>con IVA · ${paraCC>=totCCiva?'la caja alcanza':`<span class="negc">la caja alcanza solo para ${clp(Math.max(0,paraCC))}: faltan ${clp(totCCiva-Math.max(0,paraCC))}</span>`}</small></div>
    <div class="kpi"><span>Puede sacar Happy Home</span><b class="${Math.min(totHH,libre)<=0?'negc':'pos'}">${clp(Math.max(0,Math.min(totHH,libre)))}</b><small>según las obras: ${clp(totHH)} · plata libre: ${clp(libre)}</small></div>
    <div class="kpi"><span>Sueldo sostenible (promedio)</span><b>${clp(sueldoSost)}</b><small>al mes, entre los socios, con lo que ha generado HH desde abril</small></div>
    <div class="kpi"><span>Generado vs. retirado desde abril</span><b class="${retirado>generadoHH?'negc':'pos'}">${clp(generadoHH-retirado)}</b><small>generado ${clp(generadoHH)} · retirado ${clp(retirado)}</small></div>
