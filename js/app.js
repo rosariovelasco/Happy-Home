@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610011448';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011448';
+import * as api from './api.js?v=202610011457';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011457';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -211,7 +211,7 @@ function proyeccion(){
 }
 V.caja=()=>{
   const P=proyeccion(); const mx=Math.max(...P.map(p=>Math.abs(p.saldo)),1);
-  return `<div><h1>Caja</h1><p class="sub">Tres preguntas: cuánta plata es realmente libre hoy, quién nos debe y qué viene en las próximas 8 semanas.</p></div>
+  return `<div><h1>Caja</h1><p class="sub">Tres preguntas: cuánta plata es realmente libre hoy, quién nos debe y qué viene en las próximas 8 semanas.</p><div class="row" style="margin-top:8px"><button class="btn ghost" type="button" data-go="reparto">Ver reparto del mes y cuánto se puede sacar →</button></div></div>
   <div class="grid g2">
   <section class="card"><h2>Plata libre hoy</h2>${desgloseLibre()}</section>
   <section class="card"><h2>Por cobrar</h2><div class="tbl"><table><thead><tr><th>Qué</th><th class="n">Monto</th><th>Cuándo espero cobrar</th></tr></thead><tbody>
@@ -329,7 +329,7 @@ const TIPOS=[
  {k:'devol',t:'Devolución de proveedor',d:'Te devuelven un pago de más',obra:'req',prov:true},
  {k:'nopago',t:'Monto no pagado por el cliente',d:'Saldo que el cliente no pagará',obra:'req'},
  {k:'reembsocio',t:'Devolver a un socio',d:'HH le paga a un socio lo que puso de su bolsillo'},
- {k:'retiro',t:'Retiro de socio',d:'Max o Rosario retiran utilidad'},
+ {k:'retiro',t:'Retiro de socio',d:'Max o Rosario retiran utilidad',obra:'opt'},
  {k:'f29',t:'Pago F29',d:'IVA mensual al SII'},
  {k:'cuota',t:'Cuota de crédito',d:'Auto, Fogape: capital + interés'},
  {k:'traspaso',t:'Traspaso entre cuentas',d:'Entre cuentas HH o la reserva'},
@@ -349,7 +349,7 @@ function formHTML(){
   if(t.k==='cobro'||t.k==='reemb'||t.k==='nopago') h+=`<label>Cliente<input id="f_prov" value="${esc(F.prov)}" placeholder="Se toma de la obra"></label>`;
   if(t.k==='retiro'||t.k==='socio'||t.k==='reembsocio') h+=`<label>Socio<select id="f_socio">${['Rosario','Max'].map(s=>`<option ${F.socio===s?'selected':''}>${s}</option>`).join('')}</select></label>`;
   if(t.prov) h+=`<label>Cuenta<select id="f_cuenta">${['','Materiales','Subcontrato / mano de obra','Arriendo equipos y herramientas','Fletes y traslados','Retiro de escombros','Viáticos','Participación CC','Comisión de cobro','Remuneraciones y honorarios','Teléfono e internet','Vehículo y traslados','Marketing','Patentes y permisos','Otros gastos generales'].map(c=>`<option ${F.cuenta===c?'selected':''} value="${c}">${c||'(la sugiere el proveedor)'}</option>`).join('')}</select></label>`;
-  if(t.obra) h+=`<label>Obra${t.obra==='req'?'':' <small>(obligatoria si es costo de obra)</small>'}<select id="f_obra"><option value="">${t.obra==='req'?'Elige la obra':'General HH (sin obra)'}</option>${obrasSelF().map(o=>`<option value="${o.id}" ${F.obra===o.id?'selected':''}>${esc(o.nombre)}${o.abierta?'':' (cerrada)'}</option>`).join('')}</select></label>`;
+  if(t.obra) h+=`<label>${t.k==='retiro'?'De qué obra <small>(opcional: para el reparto)</small>':'Obra'+(t.obra==='req'?'':' <small>(obligatoria si es costo de obra)</small>')}<select id="f_obra"><option value="">${t.obra==='req'?'Elige la obra':'General HH (sin obra)'}</option>${obrasSelF().map(o=>`<option value="${o.id}" ${F.obra===o.id?'selected':''}>${esc(o.nombre)}${o.abierta?'':' (cerrada)'}</option>`).join('')}</select></label>`;
   if(t.doc) h+=`<label>Documento<select id="f_doc">${['Factura','Boleta','Boleta de honorarios','Nada'].map(d=>`<option ${F.doc===d?'selected':''}>${d}</option>`).join('')}</select></label><label>N° documento<input id="f_ndoc" value="${esc(F.ndoc)}" inputmode="numeric"></label>`;
   if(['pago','socio'].includes(t.k)&&F.doc==='Boleta de honorarios') h+=`<label>¿Quién retiene el 15,25%?<select id="f_ret"><option value="hh" ${F.ret!=='emisor'?'selected':''}>Happy Home (la boleta dice "Impto. Retenido")</option><option value="emisor" ${F.ret==='emisor'?'selected':''}>El emisor (retención por el contribuyente)</option></select></label>`;
   h+=`<label>${['pago','socio'].includes(t.k)&&F.doc==='Boleta de honorarios'?'Monto pagado (el «Total» líquido de la boleta)':'Monto total pagado'}${t.k==='nopago'?' (con IVA, como en el presupuesto)':''}<input id="f_monto" inputmode="numeric" value="${esc(F.monto)}" placeholder="Ej: 628343"></label>`;
@@ -653,11 +653,72 @@ async function obraSave(id){
     $('#dlg').close(); await reload('obras'); toast(id?'Obra actualizada':'Obra creada'); }catch(e){toast('No se pudo: '+(e.message||e));}
 }
 
+
+/* ---------- reparto del mes y cuánto se puede sacar ---------- */
+const COLCHON_OBRA=0.10; // colchón para imprevistos: 10% de lo que falta gastar
+function repartoObra(o){
+  const repCC=o.cc_pagado||0; // sin IVA
+  const repHH=sum(D.movs.filter(m=>m.cuenta==='Retiro de socio'&&m.pagado&&m.obra_id===o.id).map(m=>m.total));
+  const cobrado=o.cobrado_neto, gastado=o.costo_real;
+  const cajaObra=cobrado-gastado-repCC-repHH;
+  const faltaGastar=Math.max(0,(o.costo_est||0)-gastado), faltaCobrar=Math.max(0,o.pres_neto-cobrado);
+  const necesita=Math.max(0,faltaGastar-faltaCobrar), colchon=Math.round(faltaGastar*COLCHON_OBRA);
+  const repartible=Math.max(0,cajaObra-necesita-colchon);
+  let cc=0,hh=repartible;
+  if(o.un==='Construcción'){const meta=(repCC+repHH+repartible)/2; cc=Math.min(repartible,Math.max(0,Math.round(meta-repCC))); hh=repartible-cc;}
+  return {o,repCC,repHH,cobrado,gastado,cajaObra,faltaGastar,faltaCobrar,necesita,colchon,repartible,cc,hh,ccIVA:Math.round(cc*1.19)};
+}
+V.reparto=()=>{
+  const L=obras.filter(o=>o.abierta&&o.pres_neto>0).map(repartoObra);
+  const cerradasCC=obras.filter(o=>!o.abierta&&ccPendiente(o)>0);
+  const totCCiva=sum(L.map(x=>x.ccIVA))+sum(cerradasCC.map(ccPlata)), totHH=sum(L.map(x=>x.hh));
+  const paraCC=libre+ccPend; // la plata libre ya tiene apartado lo de CC
+  const fila=(a,b,neg)=>`<tr><td>${a}</td><td class="n ${neg?'negc':''}">${b}</td></tr>`;
+  // ¿cuánto puedo sacar? (desde abril)
+  const ccPendNeto=sum(obras.map(ccPendiente));
+  const generadoHH=tot.mc-ccPendNeto-(tot.e+tot.f);
+  const retirado=sum(D.movs.filter(m=>m.cuenta==='Retiro de socio'&&m.pagado&&(m.fecha||'')>='2026-04-01').map(m=>m.total));
+  const nm=meses.filter(mm=>mm<HOY.slice(0,7)).length||1;
+  const sueldoSost=Math.max(0,Math.round(generadoHH/nm));
+  return `<div>${backBtn}<h1>Reparto del mes</h1><p class="sub">Cuánto se puede repartir de cada obra en curso sin dejarla sin plata, y cuánto puede sacar Happy Home. Montos de plata con IVA; el cálculo por obra es sin IVA para que cuadre con el margen.</p></div>
+  <section class="card"><div class="grid g4">
+   <div class="kpi"><span>Transferir a Casa Construcción</span><b>${clp(Math.min(totCCiva,Math.max(0,paraCC)))}</b><small>con IVA · según las obras: ${clp(totCCiva)}</small></div>
+   <div class="kpi"><span>Puede sacar Happy Home</span><b class="${Math.min(totHH,libre)<=0?'negc':'pos'}">${clp(Math.max(0,Math.min(totHH,libre)))}</b><small>según las obras: ${clp(totHH)} · plata libre: ${clp(libre)}</small></div>
+   <div class="kpi"><span>Sueldo sostenible (promedio)</span><b>${clp(sueldoSost)}</b><small>al mes, entre los socios, con lo que ha generado HH desde abril</small></div>
+   <div class="kpi"><span>Generado vs. retirado desde abril</span><b class="${retirado>generadoHH?'negc':'pos'}">${clp(generadoHH-retirado)}</b><small>generado ${clp(generadoHH)} · retirado ${clp(retirado)}</small></div>
+  </div>
+  ${libre<0?`<p class="note bad"><b>Hoy no hay plata libre (${clp(libre)}).</b> Aunque las obras digan que hay para repartir, esa plata ya se usó en otras cosas (gastos generales, retiros de meses anteriores, otras obras). Se reparte cuando entren los próximos cobros.</p>`:totHH>libre?`<p class="note">Las obras permiten más de lo que hay en caja: el límite es la plata libre (${clp(libre)}).</p>`:''}</section>
+  ${L.map(x=>`<section class="card"><div class="spread"><h2>${esc(x.o.nombre)}</h2><span class="chip ${x.o.un}">${x.o.un}</span></div>
+   <div class="grid g2"><div class="tbl"><table><tbody>
+    ${fila('Cobrado (sin IVA)',clp(x.cobrado))}
+    ${fila('− Gastado',clp(-x.gastado))}
+    ${fila('− Ya repartido a CC (sin IVA)',clp(-x.repCC))}
+    ${fila('− Ya retirado por HH',clp(-x.repHH))}
+    <tr class="tot"><td>= Plata de la obra sin repartir</td><td class="n">${clp(x.cajaObra)}</td></tr>
+    ${fila(`− Para terminar la obra <small>(falta gastar ${clp(x.faltaGastar)}, falta cobrar ${clp(x.faltaCobrar)})</small>`,x.necesita?clp(-x.necesita):'alcanza')}
+    ${fila(`− Colchón imprevistos <small>(${Math.round(COLCHON_OBRA*100)}% de lo que falta gastar)</small>`,clp(-x.colchon))}
+    <tr class="tot"><td>= Se puede repartir</td><td class="n ${x.repartible>0?'pos':''}">${clp(x.repartible)}</td></tr>
+   </tbody></table></div>
+   <div class="effect">
+    ${x.o.un==='Construcción'?`<div><span>Casa Construcción <small>(${clp(x.cc)} + IVA de su factura)</small></span><b class="num">${clp(x.ccIVA)}</b></div>`:''}
+    <div><span>Happy Home</span><b class="num">${clp(x.hh)}</b></div>
+    ${x.o.un==='Construcción'?`<p class="help">Se reparte para que los dos queden con lo mismo: hasta hoy CC recibió ${clp(x.repCC)} y HH ${clp(x.repHH)} (sin IVA).</p>`:''}
+   </div></div></section>`).join('')}
+  ${cerradasCC.length?`<section class="card"><h2>Obras cerradas con participación pendiente</h2><div class="tbl"><table><tbody>${cerradasCC.map(o=>`<tr class="click" data-obra="${o.id}"><td>${esc(o.nombre)}</td><td class="n">${clp(ccPlata(o))} <small>con IVA</small></td></tr>`).join('')}</tbody></table></div><p class="help">Esto ya se le debe a CC: va primero que cualquier reparto nuevo.</p></section>`:''}
+  <section class="card"><h2>Reglas</h2><ol class="sub" style="margin:0;padding-left:18px">
+   <li>Solo se reparte plata ya cobrada.</li><li>Primero se guarda lo que la obra necesita para terminarse y un colchón del ${Math.round(COLCHON_OBRA*100)}% de lo que falta gastar.</li>
+   <li>En construcción se reparte para que CC y HH queden iguales. A CC se le transfiere con IVA (factura); ese IVA HH lo recupera en el F29.</li>
+   <li>HH nunca saca más que la plata libre, que ya deja apartado 1 mes de gastos generales, los pagos pendientes, el IVA y lo que se le debe a CC.</li>
+   <li>Al cerrar la obra se ajusta con el margen real.</li></ol>
+   <p class="help">Para que un retiro cuente en la obra correcta, al registrarlo elige la obra en el campo "De qué obra".</p></section>`;
+};
+
 /* ---------- Más ---------- */
-const SUB={fijos:'Gastos fijos',proveedores:'Proveedores',clientes:'Clientes',socios:'Socios y Casa Construcción',impuestos:'IVA y F29',conciliacion:'Conciliación con el banco',reporte:'Reporte del mes'};
+const SUB={reparto:'Reparto del mes',fijos:'Gastos fijos',proveedores:'Proveedores',clientes:'Clientes',socios:'Socios y Casa Construcción',impuestos:'IVA y F29',conciliacion:'Conciliación con el banco',reporte:'Reporte del mes'};
 const backBtn='<button class="back noprint" type="button" data-go="mas">← Más</button>';
 V.mas=()=>`<div><h1>Más</h1><p class="sub">Lo que no se usa todos los días.</p></div>
  <div class="hub">
+  <button type="button" data-go="reparto"><b>Reparto del mes</b><small>Cuánto se puede repartir de cada obra a CC y a HH, y cuánto pueden sacar los socios de sueldo.</small></button>
   <button type="button" data-go="reporte"><b>Reporte del mes</b><small>Una página para Max: cómo fue el mes y qué viene. Se puede imprimir.</small></button>
   <button type="button" data-go="conciliacion"><b>Conciliación con el banco</b><small>Cada línea de la cartola contra la app. ${(D.banco||[]).filter(b=>b.estado!=='falta').length} de ${(D.banco||[]).length} líneas cuadradas.</small></button>
   <button type="button" data-go="fijos"><b>Gastos fijos</b><small>Contador, Previred, Entel, TAG, seguros, créditos: qué se pagó cada mes y qué falta.</small></button>
