@@ -353,7 +353,7 @@ function formHTML(){
   h+=`<label>${['pago','socio'].includes(t.k)&&F.doc==='Boleta de honorarios'?'Monto pagado (el «Total» líquido de la boleta)':'Monto total pagado'}${t.k==='nopago'?' (con IVA, como en el presupuesto)':''}<input id="f_monto" inputmode="numeric" value="${esc(F.monto)}" placeholder="Ej: 628343"></label>`;
   if(t.k==='cuota') h+=`<label>De eso, intereses<input id="f_int" inputmode="numeric" value="${esc(F.interes)}" placeholder="Sale en la cartola del crédito"></label>`;
   if(t.k==='cobro') h+=`<label>Llegó al banco <small>(si es menos, la diferencia es comisión)</small><input id="f_llego" inputmode="numeric" value="${esc(F.llego)}" placeholder="Igual al monto"></label>`;
-  if(t.k==='reembsocio'){const dd=D.movs.filter(m=>m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso'&&!m.pagado); h+=`<label>Qué se le devuelve<select id="f_liga"><option value="">—</option>${dd.map(m=>`<option value="${m.id}" ${F.liga===m.id?'selected':''}>${esc(m.quien)} ${clp(m.total)} · ${esc((m.detalle||'').slice(0,50))}</option>`).join('')}</select></label>`;}
+  if(t.k==='reembsocio'){const dd=D.movs.filter(m=>m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso'&&!m.pagado&&m.id!==EDIT); h+=`<label>Qué se le devuelve<select id="f_liga"><option value="">—</option>${dd.map(m=>`<option value="${m.id}" ${F.liga===m.id?'selected':''}>${esc(m.quien)} ${clp(m.total)} · ${esc((m.detalle||'').slice(0,50))}</option>`).join('')}</select></label>`;}
   if(['pago','cobro','reemb'].includes(t.k)) h+=`<label>Estado<select id="f_pag"><option value="1" ${F.pagado?'selected':''}>${t.k==='pago'?'Pagado':'Cobrado'}</option><option value="0" ${!F.pagado?'selected':''}>Pendiente</option></select></label>`;
   if(t.k!=='nopago'&&t.k!=='socio') h+=`<label>${t.k==='cobro'||t.k==='reemb'||t.k==='devol'?'Entra a':'Pagado con'}<select id="f_medio">${MEDIOS.map(m=>`<option ${F.medio===m?'selected':''}>${m}</option>`).join('')}</select></label>`;
   h+=`<label>Fecha<input id="f_fecha" type="date" value="${F.fecha}"></label><label>Detalle<input id="f_det" value="${esc(F.detalle)}" placeholder="Opcional"></label>`;
@@ -405,7 +405,7 @@ function effects(){
    case 'cobro': rows.push(r('Venta neta',clp(F.doc==='Factura'?c.neto:c.M)),r('IVA débito (sobre el total facturado)',clp(c.iva)),r('Sube lo cobrado de',on));
      if(c.com) rows.push(r('Comisión descontada (costo de la obra)',clp(c.com)),r('Se crean','2 movimientos: cobro '+clp(c.M)+' + comisión '+clp(c.com)));
      rows.push(r('Caja',F.pagado?'entra '+clp(c.llego):'queda por cobrar '+clp(c.M))); if(c.com>c.M*0.05) W.push('<p class="note">La comisión es más de 5% del cobro: revisa el monto que llegó.</p>'); break;
-   case 'reembsocio': rows.push(r('Resultado','no afecta (el costo ya se cargó cuando el socio pagó)'),r('Deuda con '+F.socio,F.liga?'queda en $0':'baja '+clp(c.M)),r('Caja','sale '+clp(c.M))); if(!F.liga) W.push('<p class="note">Elige qué gasto se le está devolviendo, así queda ligado.</p>'); break;
+   case 'reembsocio': rows.push(r('Obra','no lleva: el costo ya quedó en la obra cuando el socio pagó'),r('Deuda con '+F.socio,F.liga?'queda en $0':'baja '+clp(c.M)),r('Caja','sale '+clp(c.M))); if(!F.liga) W.push('<p class="note">Elige qué gasto se le está devolviendo, así queda ligado.</p>'); break;
    case 'reemb': rows.push(r('Resta costo de',on),r('Monto',clp(c.M)),r('Venta','no es venta'),r('Caja','entra '+clp(c.M))); break;
    case 'devol': rows.push(r('Resta costo de',on),r('Monto',clp(c.M)),r('Caja','entra '+clp(c.M))); break;
    case 'nopago': rows.push(r('Pérdida de margen (neto)',clp(c.neto)),r('Obra',on),r('IVA','no aplica: nunca se facturó'),r('Caja','no se mueve')); break;
@@ -490,6 +490,7 @@ function movDlg(id){
     <dt>Documento</dt><dd>${esc(m.doc)}${m.ndoc?' N° '+esc(m.ndoc):''}</dd>
     <dt>Neto / IVA</dt><dd class="num">${clp(m.neto)} / ${clp(m.iva)}</dd>
     <dt>Detalle</dt><dd>${esc(m.detalle||'—')}</dd>
+    ${(()=>{const l=m.liga&&m.liga!==m.id?movById(m.liga):null; const hijos=D.movs.filter(x=>x.liga===m.id&&x.id!==m.id); return (l?`<dt>Ligado a</dt><dd><a href="#" data-mov="${l.id}">${l.id} · ${esc(l.quien)} ${clp(l.total)}</a> <small class="sub">(${esc(l.obra_n)})</small></dd>`:'')+(hijos.length?`<dt>Relacionados</dt><dd>${hijos.map(h=>`<a href="#" data-mov="${h.id}">${h.id} · ${esc(h.quien)} ${clp(h.total)}</a>`).join('<br>')}</dd>`:'');})()}
     <dt>Banco</dt><dd>${bk?`<span class="pos">✓ Cuadra con la cartola</span> cta ${bk.cuenta} del ${fdate(bk.fecha)} (${esc(bk.desc)})`:m.pagado?'<small>sin cartola cargada para esa fecha</small>':'<small>todavía no sale del banco</small>'}</dd>
   </dl>
   <div><h3>Cómo afecta</h3><div class="effect">${efectoMov(m).map(([a,b])=>`<div><span>${a}</span><b class="num">${b}</b></div>`).join('')}</div></div>
