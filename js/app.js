@@ -736,12 +736,15 @@ async function iniciar(){
   if(!ses){ $('#appV').hidden=true; $('#loginV').hidden=false; $('#lEmail').focus(); return; }
   ME=ses.perfil; $('#loginV').hidden=true; $('#appV').hidden=false;
   document.body.classList.toggle('max',isMax());
-  $('#quien').textContent=ME.nombre+(isMax()?' · solo lectura':'');
+  $('#quien').textContent=ME.nombre+(isMax()?' · solo lectura':'')+' · contraseña';
   if(api.esDemo){ $('#banner').hidden=false; $('#banner').querySelector('p').innerHTML='<b>Modo prueba local.</b> Datos de prueba en memoria.'; }
   try{ await reload(isMax()?'reporte':'inicio'); }catch(e){ $('#app').innerHTML=`<div class="loading">No se pudieron cargar los datos: ${esc(e.message||e)}</div>`; }
 }
 $('#loginF').addEventListener('submit',async e=>{e.preventDefault(); $('#lErr').textContent='';
   try{ await api.entrar($('#lEmail').value.trim(),$('#lPass').value); await iniciar(); }
   catch(err){ $('#lErr').textContent=/invalid/i.test(err.message)?'Correo o contraseña incorrectos.':(err.message||'No se pudo entrar'); }});
+$('#quien').addEventListener('click',()=>{abrir('Cambiar contraseña',`<label>Nueva contraseña (mínimo 10 caracteres)<input id="np1" type="password" autocomplete="new-password"></label><label>Repítela<input id="np2" type="password" autocomplete="new-password"></label><div class="row"><button class="btn" type="button" id="npGo">Guardar</button></div>`);
+  $('#npGo').addEventListener('click',async()=>{const a=$('#np1').value,b=$('#np2').value; if(a.length<10){toast('Mínimo 10 caracteres');return;} if(a!==b){toast('No coinciden');return;}
+    try{await api.cambiarClave(a); $('#dlg').close(); toast('Contraseña cambiada');}catch(e){toast('No se pudo: '+(e.message||e));}});});
 $('#salirBtn').addEventListener('click',async()=>{await api.salir(); location.reload();});
 iniciar();

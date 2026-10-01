@@ -6,8 +6,9 @@ let sb = null, mem = null;
 
 async function client() {
   if (sb) return sb;
-  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
-  sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // supabase-js 2.117.2 incluido en el repo (js/vendor) para no depender de un CDN
+  if (!window.supabase) await new Promise((ok, err) => { const sc = document.createElement('script'); sc.src = 'js/vendor/supabase.js'; sc.onload = ok; sc.onerror = err; document.head.appendChild(sc); });
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   return sb;
 }
 
