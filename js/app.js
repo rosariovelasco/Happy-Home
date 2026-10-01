@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610011509';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011509';
+import * as api from './api.js?v=202610011516';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011516';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -141,6 +141,7 @@ function ficha(id){
   $('#dlgT').innerHTML=`<h2 style="margin:0">${esc(o.nombre)}</h2><div class="row"><span class="chip ${o.un}">${o.un}</span>${o.abierta?'<span class="chip open dot">En curso</span>':noCuadrada(o)?'<span class="chip bad dot">Por cuadrar</span>':'<span class="chip dot">Cerrada</span>'}<small class="sub" style="margin:0">${esc(o.cliente||'')}${o.inicio?' · inicio '+fdate(o.inicio):''}</small></div>`;
   const cuentas=Object.entries(o.cuentas).filter(([k,v])=>v);
   $('#dlgB').innerHTML=`
+  <div class="row solo-ros noprint"><button class="btn" type="button" data-act="ob-reg" data-t="pago" data-id="${o.id}">+ Pago / gasto de esta obra</button><button class="btn ghost" type="button" data-act="ob-reg" data-t="cobro" data-id="${o.id}">+ Cobro al cliente</button><button class="btn ghost" type="button" data-act="ob-reg" data-t="reemb" data-id="${o.id}">+ Reembolso del cliente</button><button class="btn ghost" type="button" data-act="ob-reg" data-t="socio" data-id="${o.id}">+ Gasto pagado por socio</button></div>
   <div class="grid g4">
    <div class="kpi"><span>Presupuesto neto</span><b>${clp(o.pres_neto)}</b><small>${clp(o.pres_total)} con IVA</small></div>
    <div class="kpi"><span>${o.abierta?'Gastado a la fecha':'Costo directo'}</span><b>${clp(o.costo_real)}</b><small>${o.abierta&&o.costo_est?'de un costo estimado de '+clp(o.costo_est)+' · ':''}sin IVA · con IVA ${clp(o.costo_con_iva)} · sin Casa Construcción, menos reembolsos</small></div>
@@ -889,6 +890,7 @@ function onClick(e){
       'q-save':qSave,'q-ok':()=>qAprobar(+id),'q-no':()=>qRechazar(+id),anular:()=>anularMov(id),
       rapido:()=>rapido(id),'fijo-reg':()=>fijoRegistrar(+id),
       'mes-sig':()=>mesSiguiente(id),
+      'ob-reg':()=>{EDIT=null; F={...F,tipo:a.dataset.t,obra:id,prov:'',monto:'',ndoc:'',detalle:'',liga:'',cuenta:'',llego:'',pagado:true,fecha:HOY}; $('#dlg').close(); show('nuevo'); toast('Registrando en '+((obrasAll.find(o=>o.id===id)||{}).nombre||id));},
       'obra-new':()=>obraForm(null),'obra-edit':()=>obraForm(id),'obra-save':()=>obraSave(id||null),
       'cancel-edit':()=>{EDIT=null;F={...F,prov:'',monto:'',ndoc:'',liga:''};show('nuevo');},
       print:()=>window.print(),
