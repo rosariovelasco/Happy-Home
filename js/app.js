@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610011522';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011522';
+import * as api from './api.js?v=202610011527';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011527';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -70,7 +70,7 @@ async function reload(v){
 function ccExplica(o){
   const pc=o.pres_neto? o.cobrado_neto/o.pres_neto:0;
   const ganado=Math.round((o.abierta?o.cc_parte*pc:o.cc_parte)*1.19);
-  return `${o.abierta?'Le corresponde por lo cobrado ('+pct(pc*100)+')':'Le corresponde'}: ${clp(ganado)} con IVA${o.cc_pagado_total?` − ya transferido ${clp(o.cc_pagado_total)}`:''} = ${clp(ccPlata(o))}. De eso, ${clp(ccPlata(o)-ccPendiente(o))} es IVA de su factura, que HH recupera en el F29.`;
+  return `${o.abierta?'Le corresponde por lo que ya pagó el cliente ('+pct(pc*100)+')':'Le corresponde'}: ${clp(ganado)} con IVA${o.cc_pagado_total?` − ya transferido ${clp(o.cc_pagado_total)}`:''} = ${clp(ccPlata(o))}. De eso, ${clp(ccPlata(o)-ccPendiente(o))} es IVA de su factura, que HH recupera en el F29.`;
 }
 function desgloseLibre(){
   const ccObras=obras.filter(o=>ccPendiente(o)>0);
@@ -84,11 +84,11 @@ function desgloseLibre(){
    ${sec('− Colchón: 1 mes de gastos fijos',-colchon, sub('Promedio mensual de gastos generales (últimos 6 meses)','contador, Previred, Entel, TAG, seguros, etc. Se guarda para no quedar sin pagar el mes',-colchon))}
    <tr class="tot"><td>= Plata libre</td><td class="n ${libre>=0?'pos':'negc'}">${clp(libre)}</td></tr>
   </tbody></table></div>
-  <p class="help">${libre<0?'Los compromisos son mayores que la plata en el banco. No es que falte plata hoy para pagar: es que no hay plata «de libre disposición» para retiros hasta que entren los próximos cobros.':'Es la plata que se puede retirar sin comprometer obras, impuestos ni gastos fijos.'} La participación de Casa Construcción en obras en curso se estima en proporción a lo ya cobrado.</p>`;
+  <p class="help">${libre<0?'Los compromisos son mayores que la plata en el banco. No es que falte plata hoy para pagar: es que no hay plata «de libre disposición» para retiros hasta que entren los próximos cobros.':'Es la plata que se puede retirar sin comprometer obras, impuestos ni gastos fijos.'} La participación de Casa Construcción en obras en curso se estima en proporción a lo que ya pagó el cliente.</p>`;
 }
 function desgloseCobrar(){
   return `<div class="tbl"><table><tbody>
-   ${porCobrarObras.map(x=>`<tr data-obra="${x.o.id}" style="cursor:pointer"><td><b>${esc(x.o.nombre)}</b><br><small>presupuesto ${clp(x.o.pres_total)} − cobrado ${clp(x.o.cobrado_total)} (con IVA)</small></td><td class="n">${clp(x.monto)}</td></tr>`).join('')}
+   ${porCobrarObras.map(x=>`<tr data-obra="${x.o.id}" style="cursor:pointer"><td><b>${esc(x.o.nombre)}</b><br><small>presupuesto ${clp(x.o.pres_total)} − pagado por el cliente ${clp(x.o.cobrado_total)} (con IVA)</small></td><td class="n">${clp(x.monto)}</td></tr>`).join('')}
    ${cobrosExtra.map(p=>`<tr><td><b>${esc(p.quien)}</b> · ${esc(p.tipo)}<br><small>${esc(p.obra)} · ${fdate(p.fecha)} · ${p.id}</small></td><td class="n">${clp(p.total)}</td></tr>`).join('')}
    <tr class="tot"><td>Total por cobrar</td><td class="n">${clp(porCobrar)}</td></tr>
   </tbody></table></div><p class="help">Toca una obra para ver su ficha.</p>`;
@@ -98,8 +98,8 @@ function abrir(t,html){$('#dlgT').innerHTML=`<h2 style="margin:0">${t}</h2>`;$('
 const V={};
 V.inicio=()=>{
   const alerts=[];
-  obras.filter(noCuadrada).forEach(o=>alerts.push(`<li><span class="chip bad">Por cuadrar</span><span><b>${esc(o.nombre)}</b>: la diferencia entre presupuesto y lo cobrado es de ${clp(o.descuadre)} neto. No se puede cerrar hasta cobrarlo o declararlo como no pagado.</span></li>`));
-  obras.filter(o=>ccPendiente(o)>0).forEach(o=>alerts.push(`<li><span class="chip warn">Casa Construcción</span><span><b>${esc(o.nombre)}</b>: le faltan por transferir ${clp(ccPlata(o))} (con IVA) de participación${o.abierta?' sobre lo ya cobrado (estimado)':''}.</span></li>`));
+  obras.filter(noCuadrada).forEach(o=>alerts.push(`<li><span class="chip bad">Por cuadrar</span><span><b>${esc(o.nombre)}</b>: la diferencia entre presupuesto y lo pagado por el cliente es de ${clp(o.descuadre)} neto. No se puede cerrar hasta cobrarlo o declararlo como no pagado.</span></li>`));
+  obras.filter(o=>ccPendiente(o)>0).forEach(o=>alerts.push(`<li><span class="chip warn">Casa Construcción</span><span><b>${esc(o.nombre)}</b>: le faltan por transferir ${clp(ccPlata(o))} (con IVA) de participación${o.abierta?' sobre lo que ya pagó el cliente (estimado)':''}.</span></li>`));
   C.pend_pagos.forEach(p=>alerts.push(`<li><span class="chip warn">Por pagar</span><span><b>${esc(p.quien)}</b> ${clp(p.total)} · ${esc(p.obra)} · ${fdate(p.fecha)}</span></li>`));
   const open=obras.filter(o=>o.abierta);
   return `<div><h1>Cómo va Happy Home</h1><p class="sub">Desde abril 2026 (datos cuadrados con el banco).</p></div>
@@ -151,10 +151,10 @@ function ficha(id){
    <div class="kpi"><span>Presupuesto neto</span><b>${clp(o.pres_neto)}</b><small>${clp(o.pres_total)} con IVA</small></div>
    <div class="kpi"><span>${o.abierta?'Gastado a la fecha':'Costo directo'}</span><b>${clp(o.costo_real)}</b><small>${o.abierta&&o.costo_est?'de un costo estimado de '+clp(o.costo_est)+' · ':''}sin IVA · con IVA ${clp(o.costo_con_iva)} · sin Casa Construcción, menos reembolsos</small></div>
    <div class="kpi"><span>Margen ${o.abierta?'proyectado':'real'}</span><b class="${o.margen>=0?'pos':'negc'}">${clp(o.margen)}</b><small>${pct(o.margen_pct)}${o.abierta?' · presupuesto − '+(o.costo_final>o.costo_real?'costo estimado':'gastado'):''}</small></div>
-   ${cc?`<div class="kpi"><span>Queda para Happy Home</span><b>${clp(o.margen-o.cc_parte)}</b><small>después de Casa Construcción</small></div>`:`<div class="kpi"><span>Cobrado</span><b>${clp(o.cobrado_total)}</b><small>con IVA</small></div>`}
+   ${cc?`<div class="kpi"><span>Queda para Happy Home</span><b>${clp(o.margen-o.cc_parte)}</b><small>después de Casa Construcción</small></div>`:`<div class="kpi"><span>Pagado por el cliente</span><b>${clp(o.cobrado_total)}</b><small>con IVA</small></div>`}
   </div>
-  ${noCuadrada(o)?`<p class="note bad"><b>No cuadra:</b> faltan ${clp(o.descuadre)} netos entre el presupuesto y lo cobrado. Para cerrarla hay que registrar el cobro que falta o declararlo como "monto no pagado por el cliente".</p>`:''}
-  <div><h3>Cobro al cliente</h3><div class="bar"><i style="width:${cob}%"></i></div><div class="spread"><small class="num">${clp(o.cobrado_total)} cobrado</small><small class="num">${o.abierta?clp(o.por_cobrar)+' por cobrar':''}</small></div></div>
+  ${noCuadrada(o)?`<p class="note bad"><b>No cuadra:</b> faltan ${clp(o.descuadre)} netos entre el presupuesto y lo pagado por el cliente. Para cerrarla hay que registrar el pago que falta o declararlo como "monto no pagado por el cliente".</p>`:''}
+  <div><h3>Cobro al cliente</h3><div class="bar"><i style="width:${cob}%"></i></div><div class="spread"><small class="num">${clp(o.cobrado_total)} pagado por el cliente</small><small class="num">${o.abierta?clp(o.por_cobrar)+' por cobrar':''}</small></div></div>
   ${o.abierta&&o.avance_gasto!=null?`<div><h3>Gasto vs. costo estimado</h3><div class="bar"><i class="${o.avance_gasto>100?'bad':o.avance_gasto>85?'warn':''}" style="width:${Math.min(100,o.avance_gasto)}%"></i></div><small class="num">${pct(o.avance_gasto)} del estimado usado · quedan ${clp(o.costo_est-o.costo_real)}</small></div>`:''}
   <div class="tbl"><table><thead><tr><th>Costo por cuenta</th><th class="n">Neto</th></tr></thead><tbody>
    ${cuentas.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${clp(v)}</td></tr>`).join('')}
@@ -163,7 +163,7 @@ function ficha(id){
   </tbody></table></div>
   ${cc?(()=>{const pc=o.pres_neto?o.cobrado_neto/o.pres_neto:0; const gan=o.abierta?Math.round(o.cc_parte*pc):o.cc_parte; return `<div class="tbl"><table><thead><tr><th>Casa Construcción (50% del margen)</th><th class="n">Sin IVA</th><th class="n">Plata real (con IVA)</th></tr></thead><tbody>
     <tr><td>Participación total ${o.abierta?'proyectada':''}</td><td class="n">${clp(o.cc_parte)}</td><td class="n">${clp(o.cc_parte*1.19)}</td></tr>
-    ${o.abierta?`<tr><td>Le corresponde por lo cobrado (${pct(pc*100)})</td><td class="n">${clp(gan)}</td><td class="n">${clp(gan*1.19)}</td></tr>`:''}
+    ${o.abierta?`<tr><td>Le corresponde por lo que ya pagó el cliente (${pct(pc*100)})</td><td class="n">${clp(gan)}</td><td class="n">${clp(gan*1.19)}</td></tr>`:''}
     <tr><td>Ya transferido</td><td class="n">${clp(o.cc_pagado)}</td><td class="n">${clp(o.cc_pagado_total)}</td></tr>
     <tr class="tot"><td>Falta transferir${o.abierta?' (estimado)':''}</td><td class="n">${clp(ccPendiente(o))}</td><td class="n">${clp(ccPlata(o))}</td></tr></tbody></table></div><p class="help">CC factura su participación: de lo que le transfieres, el IVA lo recupera HH en el F29.</p>`;})():''}
   <div><h3>Movimientos de esta obra</h3><div class="tbl"><table><thead><tr><th>Fecha</th><th>Quién</th><th>Qué es</th><th class="n">Monto</th></tr></thead><tbody>
@@ -240,7 +240,7 @@ V.movs=()=>{
   const pend=D.movs.filter(m=>!m.pagado);
   const pp=pend.filter(m=>m.tipo==='egreso'&&m.nat!=='Pérdida'), pc=pend.filter(m=>m.tipo==='ingreso'&&['Venta','Recupero'].includes(m.nat));
   const ord=L=>L.slice().sort((a,b)=>(a.fecha||'0000').localeCompare(b.fecha||'0000'));
-  const lista=(L,ing)=>L.length?`<div class="tbl"><table><tbody>${ord(L).map(m=>`<tr data-mov="${m.id}"><td class="num">${m.fecha?fdate(m.fecha):'<span class="negc">sin fecha</span>'}</td><td><b>${esc(m.quien)}</b><br><small class="sub">${esc(m.obra_n)}${m.detalle?' · '+esc(m.detalle.slice(0,45)):''}</small></td><td class="n">${clp(m.total)}</td><td class="solo-ros"><button class="x" type="button" data-act="rapido" data-id="${m.id}">${ing?'Cobrado':'Pagado'}</button></td></tr>`).join('')}
+  const lista=(L,ing)=>L.length?`<div class="tbl"><table><tbody>${ord(L).map(m=>`<tr data-mov="${m.id}"><td class="num">${m.fecha?fdate(m.fecha):'<span class="negc">sin fecha</span>'}</td><td><b>${esc(m.quien)}</b><br><small class="sub">${esc(m.obra_n)}${m.detalle?' · '+esc(m.detalle.slice(0,45)):''}</small></td><td class="n">${clp(m.total)}</td><td class="solo-ros"><button class="x" type="button" data-act="rapido" data-id="${m.id}">Pagado</button></td></tr>`).join('')}
     <tr class="tot"><td colspan="2">Total</td><td class="n">${clp(sum(L.map(m=>m.total)))}</td><td class="solo-ros"></td></tr></tbody></table></div>`:'<p class="sub">Nada pendiente.</p>';
   return `<div><h1>Movimientos</h1><p class="sub">Arriba lo que falta pagar o cobrar; abajo lo ya realizado. Toca cualquiera para ver el detalle o corregirlo.</p></div>
   <div class="grid g2">
@@ -268,7 +268,7 @@ function movTable(){
 }
 function rapido(id){
   const m=movById(id); if(!m) return;
-  abrir((m.tipo==='ingreso'?'Marcar cobrado: ':'Marcar pagado: ')+esc(m.quien)+' '+clp(m.total),`<div class="form">
+  abrir((m.tipo==='ingreso'?'Marcar pagado por el cliente: ':'Marcar pagado: ')+esc(m.quien)+' '+clp(m.total),`<div class="form">
    <label>Fecha<input type="date" id="mp_f" value="${HOY}"></label>
    <label>${m.tipo==='ingreso'?'Entró a':'Desde'}<select id="mp_c">${MEDIOS.map(x=>`<option ${m.medio===x?'selected':''}>${x}</option>`).join('')}</select></label></div>
    <div class="row"><button class="btn" type="button" data-act="pagar" data-id="${m.id}">Confirmar</button></div>`);
@@ -334,7 +334,7 @@ function fijoRegistrar(i){
 /* registrar */
 const TIPOS=[
  {k:'pago',t:'Pago a proveedor',d:'Compra o servicio de una obra o de la empresa',obra:'opt',doc:true,prov:true},
- {k:'cobro',t:'Cobro a cliente',d:'Estado de pago o factura cobrada',obra:'req',doc:true},
+ {k:'cobro',t:'Cobro a cliente',d:'Factura o estado de pago al cliente',obra:'req',doc:true},
  {k:'socio',t:'Gasto pagado por un socio',d:'Se pagó con cuenta o tarjeta personal',obra:'opt',doc:true,prov:true},
  {k:'reemb',t:'Reembolso del cliente',d:'El cliente devuelve compras hechas por HH',obra:'req'},
  {k:'devol',t:'Devolución de proveedor',d:'Te devuelven un pago de más',obra:'req',prov:true},
@@ -364,11 +364,11 @@ function formHTML(){
   if(t.doc) h+=`<label>Documento<select id="f_doc">${['Factura','Boleta','Boleta de honorarios','Nada'].map(d=>`<option ${F.doc===d?'selected':''}>${d}</option>`).join('')}</select></label><label>N° documento<input id="f_ndoc" value="${esc(F.ndoc)}" inputmode="numeric"></label>`;
   if(t.doc) h+=`<label>Estado del documento<select id="f_edoc">${[['ok',t.k==='cobro'?'Factura enviada':'Recibido'],['falta',t.k==='cobro'?'Falta enviar factura':'Falta factura'],['por_emitir','Hacer boleta'],['no_aplica','No aplica']].map(([k,l])=>`<option value="${k}" ${(F.edoc||(F.doc==='Nada'?'no_aplica':'ok'))===k?'selected':''}>${l}</option>`).join('')}</select></label>`;
   if(['pago','socio'].includes(t.k)&&F.doc==='Boleta de honorarios') h+=`<label>¿Quién retiene el 15,25%?<select id="f_ret"><option value="hh" ${F.ret!=='emisor'?'selected':''}>Happy Home (la boleta dice "Impto. Retenido")</option><option value="emisor" ${F.ret==='emisor'?'selected':''}>El emisor (retención por el contribuyente)</option></select></label>`;
-  h+=`<label>${['pago','socio'].includes(t.k)&&F.doc==='Boleta de honorarios'?'Monto pagado (el «Total» líquido de la boleta)':'Monto total pagado'}${t.k==='nopago'?' (con IVA, como en el presupuesto)':''}<input id="f_monto" inputmode="numeric" value="${esc(F.monto)}" placeholder="Ej: 628343"></label>`;
+  h+=`<label>${['pago','socio'].includes(t.k)&&F.doc==='Boleta de honorarios'?'Monto pagado (el «Total» líquido de la boleta)':t.k==='cobro'?'Monto cobrado (total de la factura)':t.k==='reemb'?'Monto del reembolso':'Monto total pagado'}${t.k==='nopago'?' (con IVA, como en el presupuesto)':''}<input id="f_monto" inputmode="numeric" value="${esc(F.monto)}" placeholder="Ej: 628343"></label>`;
   if(t.k==='cuota') h+=`<label>De eso, intereses<input id="f_int" inputmode="numeric" value="${esc(F.interes)}" placeholder="Sale en la cartola del crédito"></label>`;
-  if(t.k==='cobro') h+=`<label>Llegó al banco <small>(si es menos, la diferencia es comisión)</small><input id="f_llego" inputmode="numeric" value="${esc(F.llego)}" placeholder="Igual al monto"></label>`;
+  if(t.k==='cobro') h+=`<label>Monto pagado por el cliente <small>(lo que llegó; si es menos, la diferencia es comisión)</small><input id="f_llego" inputmode="numeric" value="${esc(F.llego)}" placeholder="Igual al monto"></label>`;
   if(t.k==='reembsocio'){const dd=D.movs.filter(m=>m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso'&&!m.pagado&&m.id!==EDIT); h+=`<label>Qué se le devuelve<select id="f_liga"><option value="">—</option>${dd.map(m=>`<option value="${m.id}" ${F.liga===m.id?'selected':''}>${esc(m.quien)} ${clp(m.total)} · ${esc((m.detalle||'').slice(0,50))}</option>`).join('')}</select></label>`;}
-  if(['pago','cobro','reemb'].includes(t.k)) h+=`<label>Estado<select id="f_pag"><option value="1" ${F.pagado?'selected':''}>${t.k==='pago'?'Pagado':'Cobrado'}</option><option value="0" ${!F.pagado?'selected':''}>Pendiente</option></select></label>`;
+  if(['pago','cobro','reemb'].includes(t.k)) h+=`<label>Estado<select id="f_pag"><option value="1" ${F.pagado?'selected':''}>Pagado</option><option value="0" ${!F.pagado?'selected':''}>Pendiente de pago</option></select></label>`;
   if(t.k!=='nopago'&&t.k!=='socio') h+=`<label>${t.k==='cobro'||t.k==='reemb'||t.k==='devol'?'Entra a':'Pagado con'}<select id="f_medio">${MEDIOS.map(m=>`<option ${F.medio===m?'selected':''}>${m}</option>`).join('')}</select></label>`;
   h+=`<label>Fecha<input id="f_fecha" type="date" value="${F.fecha}"></label><label>Detalle<input id="f_det" value="${esc(F.detalle)}" placeholder="Opcional"></label>`;
   h+=`<label>Respaldo (foto o PDF)<input id="f_adj" type="file" accept="image/*,application/pdf"></label>`;
@@ -418,7 +418,7 @@ function effects(){
     if(c.tc) rows.push(r('Deuda con socio','se crea sola · aparece en Caja y en Socios'));
     if(c.nat==='Costo directo'&&!F.obra) W.push('<p class="note bad">Un costo directo necesita una obra. Elige la obra o elige «General HH (sin obra)» con una cuenta de gastos generales.</p>');
     break;
-   case 'cobro': rows.push(r('Venta neta',clp(F.doc==='Factura'?c.neto:c.M)),r('IVA débito (sobre el total facturado)',clp(c.iva)),r('Sube lo cobrado de',on));
+   case 'cobro': rows.push(r('Venta neta',clp(F.doc==='Factura'?c.neto:c.M)),r('IVA débito (sobre el total facturado)',clp(c.iva)),r('Sube lo pagado por el cliente en',on));
      if(c.com) rows.push(r('Comisión descontada (costo de la obra)',clp(c.com)),r('Se crean','2 movimientos: cobro '+clp(c.M)+' + comisión '+clp(c.com)));
      rows.push(r('Caja',F.pagado?'entra '+clp(c.llego):'queda por cobrar '+clp(c.M))); if(c.com>c.M*0.05) W.push('<p class="note">La comisión es más de 5% del cobro: revisa el monto que llegó.</p>'); break;
    case 'reembsocio': rows.push(r('Obra','no lleva: el costo ya quedó en la obra cuando el socio pagó'),r('Deuda con '+F.socio,F.liga?'queda en $0':'baja '+clp(c.M)),r('Caja','sale '+clp(c.M))); if(!F.liga) W.push('<p class="note">Elige qué gasto se le está devolviendo, así queda ligado.</p>'); break;
@@ -497,7 +497,7 @@ function movDlg(id){
   if(!m){const p=C.pend_pagos.find(x=>x.id===id); if(!p) return; m={id,fecha:p.fecha,tipo:'egreso',quien:p.quien,total:p.total,neto:p.total,iva:0,doc:'—',ndoc:'',pagado:false,detalle:p.detalle,nat:'—',cuenta:'—',obra_n:p.obra};}
   const bk=(D.banco||[]).find(b=>b.movs.includes(id));
   const o=obraDe(m);
-  $('#dlgT').innerHTML=`<h2 style="margin:0">${esc(m.quien||'—')} <span class="num" style="font-weight:500">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</span></h2><div class="row"><span class="chip">${esc(m.cuenta)}</span>${m.pagado?'<span class="chip open">'+(m.tipo==='ingreso'?'Cobrado':'Pagado')+'</span>':'<span class="chip warn">Pendiente</span>'}<small class="sub" style="margin:0">${m.id}</small></div>`;
+  $('#dlgT').innerHTML=`<h2 style="margin:0">${esc(m.quien||'—')} <span class="num" style="font-weight:500">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</span></h2><div class="row"><span class="chip">${esc(m.cuenta)}</span>${m.pagado?'<span class="chip open">'+'Pagado'+'</span>':'<span class="chip warn">Pendiente</span>'}<small class="sub" style="margin:0">${m.id}</small></div>`;
   $('#dlgB').innerHTML=`<dl class="dl">
     <dt>Fecha</dt><dd>${m.fecha?fdate(m.fecha)+' '+m.fecha.slice(0,4):'<span class="negc">sin fecha</span>'}</dd>
     <dt>Obra</dt><dd>${o?`<a href="#" data-obra="${o.id}">${esc(m.obra_n)}</a>`:esc(m.obra_n)}</dd>
@@ -511,7 +511,7 @@ function movDlg(id){
   </dl>
   <div><h3>Cómo afecta</h3><div class="effect">${efectoMov(m).map(([a,b])=>`<div><span>${a}</span><b class="num">${b}</b></div>`).join('')}</div></div>
   <div class="row solo-ros noprint">
-    ${!m.pagado?`<label style="flex:1;min-width:150px">Fecha de pago<input type="date" id="mp_f" value="${HOY}"></label><label style="flex:1;min-width:180px">${m.tipo==='ingreso'?'Entró a':'Desde'}<select id="mp_c">${MEDIOS.map(x=>`<option ${m.medio===x?'selected':''}>${x}</option>`).join('')}</select></label><button class="btn" type="button" data-act="pagar" data-id="${m.id}">Marcar ${m.tipo==='ingreso'?'cobrado':'pagado'}</button>`:''}
+    ${!m.pagado?`<label style="flex:1;min-width:150px">Fecha de pago<input type="date" id="mp_f" value="${HOY}"></label><label style="flex:1;min-width:180px">${m.tipo==='ingreso'?'Entró a':'Desde'}<select id="mp_c">${MEDIOS.map(x=>`<option ${m.medio===x?'selected':''}>${x}</option>`).join('')}</select></label><button class="btn" type="button" data-act="pagar" data-id="${m.id}">Marcar pagado</button>`:''}
     <button class="btn ghost" type="button" data-act="editar" data-id="${m.id}">Corregir</button>
     <button class="x" type="button" data-act="anular" data-id="${m.id}">Anular</button>
     ${m.tipo==='egreso'&&m.nat==='Costo directo'?`<button class="btn ghost" type="button" data-act="devol" data-id="${m.id}">Registrar devolución</button>`:''}
@@ -524,7 +524,7 @@ function movDlg(id){
 async function marcarPagado(id){
   const m=movById(id); const f=$('#mp_f').value; const medio=$('#mp_c').value;
   try{ await api.actualizar('movimientos',id,{pagado:true,fecha:f,medio});
-    $('#dlg').close(); await reload(); toast('Marcado como '+(m&&m.tipo==='ingreso'?'cobrado':'pagado')+'. Plata libre: '+clp(libre));
+    $('#dlg').close(); await reload(); toast('Marcado como pagado. Plata libre: '+clp(libre));
   }catch(e){toast('No se pudo: '+(e.message||e));}
 }
 async function anularMov(id){
@@ -555,7 +555,7 @@ function cierre(id){
   const ccReal=o.un==='Construcción'?Math.max(0,Math.round(margenReal*0.5)):0;
   const gastoPct=o.costo_est?o.costo_real/o.costo_est*100:null;
   const items=[
-    [o.por_cobrar<=0,'Cobrado completo',o.por_cobrar<=0?`Presupuesto ${clp(o.pres_total)} = cobrado ${clp(o.cobrado_total)}.`:`Faltan ${clp(o.por_cobrar)} (con IVA). Registra el cobro o declara el «monto no pagado por el cliente».`,o.por_cobrar>0?`<button class="btn ghost" type="button" data-act="ir-cobro" data-id="${o.id}">Registrar cobro</button> <button class="btn ghost" type="button" data-act="ir-nopago" data-id="${o.id}">Declarar no pagado</button>`:''],
+    [o.por_cobrar<=0,'Pagado completo',o.por_cobrar<=0?`Presupuesto ${clp(o.pres_total)} = pagado por el cliente ${clp(o.cobrado_total)}.`:`Faltan ${clp(o.por_cobrar)} (con IVA). Registra el cobro o declara el «monto no pagado por el cliente».`,o.por_cobrar>0?`<button class="btn ghost" type="button" data-act="ir-cobro" data-id="${o.id}">Registrar cobro</button> <button class="btn ghost" type="button" data-act="ir-nopago" data-id="${o.id}">Declarar no pagado</button>`:''],
     [pend.length===0,'Sin pagos pendientes de la obra',pend.length?pend.map(p=>`${esc(p.quien)} ${clp(p.total)}`).join(' · '):'Todos los proveedores de la obra están pagados.',''],
     [gastoPct==null||gastoPct>=75,'Costos completos',gastoPct==null?'No había costo estimado.':`El gasto real es ${pct(gastoPct)} del estimado (${clp(o.costo_real)} de ${clp(o.costo_est)}). ${gastoPct<75?'Es bastante menos de lo esperado: ¿falta registrar algún costo (mano de obra, pasto, flete)? Si está completo, confírmalo.':''}`,gastoPct!=null&&gastoPct<75?'<label class="row" style="gap:6px;font-weight:500"><input type="checkbox" id="ci_ok" style="width:auto"> Sí, están todos los costos</label>':''],
   ];
@@ -713,7 +713,7 @@ V.reparto=()=>{
   ${libre<0?`<p class="note bad"><b>Hoy no hay plata libre (${clp(libre)}).</b> Aunque las obras digan que hay para repartir, esa plata ya se usó en otras cosas (gastos generales, retiros de meses anteriores, otras obras). Se reparte cuando entren los próximos cobros.</p>`:totHH>libre?`<p class="note">Las obras permiten más de lo que hay en caja: el límite es la plata libre (${clp(libre)}).</p>`:''}</section>
   ${L.map(x=>`<section class="card"><div class="spread"><h2>${esc(x.o.nombre)}</h2><span class="chip ${x.o.un}">${x.o.un}</span></div>
    <div class="grid g2"><div class="tbl"><table><tbody>
-    ${fila('Cobrado (sin IVA)',clp(x.cobrado))}
+    ${fila('Pagado por el cliente (sin IVA)',clp(x.cobrado))}
     ${fila('− Gastado',clp(-x.gastado))}
     ${fila('− Ya repartido a CC (sin IVA)',clp(-x.repCC))}
     ${fila('− Ya retirado por HH',clp(-x.repHH))}
@@ -729,7 +729,7 @@ V.reparto=()=>{
    </div></div></section>`).join('')}
   ${cerradasCC.length?`<section class="card"><h2>Obras cerradas con participación pendiente</h2><div class="tbl"><table><tbody>${cerradasCC.map(o=>`<tr class="click" data-obra="${o.id}"><td>${esc(o.nombre)}</td><td class="n">${clp(ccPlata(o))} <small>con IVA</small></td></tr>`).join('')}</tbody></table></div><p class="help">Esto ya se le debe a CC: va primero que cualquier reparto nuevo.</p></section>`:''}
   <section class="card"><h2>Reglas</h2><ol class="sub" style="margin:0;padding-left:18px">
-   <li>Solo se reparte plata ya cobrada.</li><li>Primero se guarda lo que la obra necesita para terminarse y un colchón del ${Math.round(COLCHON_OBRA*100)}% de lo que falta gastar.</li>
+   <li>Solo se reparte plata que el cliente ya pagó.</li><li>Primero se guarda lo que la obra necesita para terminarse y un colchón del ${Math.round(COLCHON_OBRA*100)}% de lo que falta gastar.</li>
    <li>En construcción se reparte para que CC y HH queden iguales. A CC se le transfiere con IVA (factura); ese IVA HH lo recupera en el F29.</li>
    <li>HH nunca saca más que la plata libre, que ya deja apartado 1 mes de gastos generales, los pagos pendientes, el IVA y lo que se le debe a CC.</li>
    <li>Al cerrar la obra se ajusta con el margen real.</li></ol>
@@ -748,7 +748,7 @@ V.mas=()=>`<div><h1>Más</h1><p class="sub">Lo que no se usa todos los días.</p
   <button type="button" data-go="impuestos"><b>IVA y F29</b><small>Débito, crédito y pago de cada mes.</small></button>
   <button type="button" data-go="socios"><b>Socios y Casa Construcción</b><small>Retiros, lo que HH les debe a los socios y la participación de CC.</small></button>
   <button type="button" data-go="proveedores"><b>Proveedores</b><small>Cuánto se le ha comprado a cada uno y su cuenta por defecto.</small></button>
-  <button type="button" data-go="clientes"><b>Clientes</b><small>Obras, cobrado y por cobrar de cada cliente.</small></button>
+  <button type="button" data-go="clientes"><b>Clientes</b><small>Obras, lo pagado y lo por cobrar de cada cliente.</small></button>
  </div>`;
 const normQ=s=>(s||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/^\w/,c=>c.toUpperCase());
 let fprov='';
@@ -791,7 +791,7 @@ V.socios=()=>{
   <section class="card"><h2>Casa Construcción: participación por obra</h2><div class="tbl"><table><thead><tr><th>Obra</th><th>Estado</th><th class="n">Margen (sin IVA)</th><th class="n">50% para CC (sin IVA)</th><th class="n">Ya transferido</th><th class="n">Falta transferir (con IVA)</th></tr></thead><tbody>
    ${cc.map(o=>`<tr class="click" data-obra="${o.id}"><td>${esc(o.nombre)}</td><td>${o.abierta?'<span class="chip open">En curso</span>':noCuadrada(o)?'<span class="chip bad">Por cuadrar</span>':'<span class="chip">Cerrada</span>'}</td><td class="n">${clp(o.margen)}</td><td class="n">${clp(o.cc_parte)}</td><td class="n">${clp(o.cc_pagado_total)}</td><td class="n">${ccPendiente(o)?clp(ccPlata(o)):'—'}</td></tr>`).join('')}
    <tr class="tot"><td colspan="5">Total por pagar</td><td class="n">${clp(ccPend)}</td></tr></tbody></table></div>
-   <p class="help"><b>Decisión pendiente:</b> en obras en curso, ¿la participación se paga sobre lo cobrado, por estado de pago o al cierre? Hoy se estima sobre lo cobrado.</p></section>`;
+   <p class="help"><b>Decisión pendiente:</b> en obras en curso, ¿la participación se paga sobre lo que ya pagó el cliente, por estado de pago o al cierre? Hoy se estima sobre lo que ya pagó el cliente.</p></section>`;
 };
 V.impuestos=()=>{
   const ms=[...meses];
@@ -846,7 +846,7 @@ V.reporte=()=>{
     <div><span><b>Plata libre</b></span><b class="num ${libre<0?'negc':'pos'}">${clp(libre)}</b></div>
     <div><span>Por cobrar a clientes</span><b class="num">${clp(porCobrar)}</b></div></div>
     <p class="help">${libre<0?'No hay plata libre para retiros hasta los próximos cobros.':'Se puede retirar hasta la plata libre.'}</p></section>
-   <section class="card"><h2>Obras en curso</h2><div class="tbl"><table><tbody>${open.map(o=>`<tr class="click" data-obra="${o.id}"><td>${esc(o.nombre)}</td><td class="n">${clp(o.margen)}<br><small>${pct(o.margen_pct)} proyectado</small></td><td class="n"><small>${o.por_cobrar>0?clp(o.por_cobrar)+' por cobrar':'cobrada'}</small></td></tr>`).join('')}</tbody></table></div></section>
+   <section class="card"><h2>Obras en curso</h2><div class="tbl"><table><tbody>${open.map(o=>`<tr class="click" data-obra="${o.id}"><td>${esc(o.nombre)}</td><td class="n">${clp(o.margen)}<br><small>${pct(o.margen_pct)} proyectado</small></td><td class="n"><small>${o.por_cobrar>0?clp(o.por_cobrar)+' por cobrar':'pagada'}</small></td></tr>`).join('')}</tbody></table></div></section>
   </div>
   <section class="card"><h2>En qué se fueron los gastos fijos</h2><div class="tbl"><table><tbody>${top.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${clp(v)}</td></tr>`).join('')}</tbody></table></div></section>`;
 };
