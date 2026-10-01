@@ -349,7 +349,8 @@ function formHTML(){
   if(t.prov) h+=`<label>Cuenta<select id="f_cuenta">${['','Materiales','Subcontrato / mano de obra','Arriendo equipos y herramientas','Fletes y traslados','Retiro de escombros','Viáticos','Participación CC','Comisión de cobro','Remuneraciones y honorarios','Teléfono e internet','Vehículo y traslados','Marketing','Patentes y permisos','Otros gastos generales'].map(c=>`<option ${F.cuenta===c?'selected':''} value="${c}">${c||'(la sugiere el proveedor)'}</option>`).join('')}</select></label>`;
   if(t.obra) h+=`<label>Obra${t.obra==='req'?'':' <small>(obligatoria si es costo de obra)</small>'}<select id="f_obra"><option value="">${t.obra==='req'?'Elige la obra':'General HH (sin obra)'}</option>${obrasSelF().map(o=>`<option value="${o.id}" ${F.obra===o.id?'selected':''}>${esc(o.nombre)}${o.abierta?'':' (cerrada)'}</option>`).join('')}</select></label>`;
   if(t.doc) h+=`<label>Documento<select id="f_doc">${['Factura','Boleta','Boleta de honorarios','Nada'].map(d=>`<option ${F.doc===d?'selected':''}>${d}</option>`).join('')}</select></label><label>N° documento<input id="f_ndoc" value="${esc(F.ndoc)}" inputmode="numeric"></label>`;
-  h+=`<label>Monto total pagado${t.k==='nopago'?' (con IVA, como en el presupuesto)':''}<input id="f_monto" inputmode="numeric" value="${esc(F.monto)}" placeholder="Ej: 628343"></label>`;
+  if(['pago','socio'].includes(t.k)&&F.doc==='Boleta de honorarios') h+=`<label>¿Quién retiene el 15,25%?<select id="f_ret"><option value="hh" ${F.ret!=='emisor'?'selected':''}>Happy Home (la boleta dice "Impto. Retenido")</option><option value="emisor" ${F.ret==='emisor'?'selected':''}>El emisor (retención por el contribuyente)</option></select></label>`;
+  h+=`<label>${['pago','socio'].includes(t.k)&&F.doc==='Boleta de honorarios'?'Monto pagado (el «Total» líquido de la boleta)':'Monto total pagado'}${t.k==='nopago'?' (con IVA, como en el presupuesto)':''}<input id="f_monto" inputmode="numeric" value="${esc(F.monto)}" placeholder="Ej: 628343"></label>`;
   if(t.k==='cuota') h+=`<label>De eso, intereses<input id="f_int" inputmode="numeric" value="${esc(F.interes)}" placeholder="Sale en la cartola del crédito"></label>`;
   if(t.k==='cobro') h+=`<label>Llegó al banco <small>(si es menos, la diferencia es comisión)</small><input id="f_llego" inputmode="numeric" value="${esc(F.llego)}" placeholder="Igual al monto"></label>`;
   if(t.k==='reembsocio'){const dd=D.movs.filter(m=>m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso'&&!m.pagado); h+=`<label>Qué se le devuelve<select id="f_liga"><option value="">—</option>${dd.map(m=>`<option value="${m.id}" ${F.liga===m.id?'selected':''}>${esc(m.quien)} ${clp(m.total)} · ${esc((m.detalle||'').slice(0,50))}</option>`).join('')}</select></label>`;}
@@ -360,7 +361,8 @@ function formHTML(){
   $('#fm').innerHTML=h; bindForm(); effects();
 }
 function bindForm(){
-  const map={f_prov:'prov',f_obra:'obra',f_doc:'doc',f_ndoc:'ndoc',f_monto:'monto',f_medio:'medio',f_fecha:'fecha',f_socio:'socio',f_int:'interes',f_cuenta:'cuenta',f_llego:'llego',f_det:'detalle',f_liga:'liga'};
+  const map={f_ret:'ret',f_prov:'prov',f_obra:'obra',f_doc:'doc',f_ndoc:'ndoc',f_monto:'monto',f_medio:'medio',f_fecha:'fecha',f_socio:'socio',f_int:'interes',f_cuenta:'cuenta',f_llego:'llego',f_det:'detalle',f_liga:'liga'};
+  const fd=document.getElementById('f_doc'); if(fd) fd.addEventListener('change',()=>{F.doc=fd.value; formHTML();});
   const pg=document.getElementById('f_pag'); if(pg) pg.addEventListener('input',()=>{F.pagado=pg.value==='1'; effects();});
   const lg=document.getElementById('f_liga'); if(lg) lg.addEventListener('change',()=>{const m=movById(lg.value); if(m){F.monto=String(m.total); F.socio=/max/i.test(m.quien)?'Max':'Rosario'; formHTML();}});
   Object.entries(map).forEach(([id,k])=>{const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{F[k]=el.value; if(k==='prov'){const p=D.proveedores[titleCase(el.value)]; if(p&&!F.cuenta){ /* sugerencia */ }} effects();})});
@@ -377,7 +379,7 @@ function calc(){
   let iva=0, neto=M, ret=0;
   if(['pago','cobro','socio'].includes(t)){
     if(F.doc==='Factura'){neto=Math.round(M/1.19); iva=M-neto;}
-    if(F.doc==='Boleta de honorarios'){ret=Math.round(M*0.1525); }
+    if(F.doc==='Boleta de honorarios'&&F.ret!=='emisor'&&['pago','socio'].includes(t)){const bruto=Math.round(M/(1-0.1525)); ret=bruto-M; neto=bruto;}
   }
   if(t==='nopago'){neto=Math.round(M/1.19);}
   let interes=+String(F.interes).replace(/\D/g,'')||0;
@@ -392,8 +394,8 @@ function effects(){
   switch(c.t){
    case 'pago': case 'socio':
     rows.push(r('Cuenta',esc(c.cuenta||'—')+(c.p&&!F.cuenta?' <small>(la última vez)</small>':'')));
-    rows.push(r('Neto (costo)',clp(c.neto)),r('IVA crédito fiscal',F.doc==='Factura'?clp(c.iva):'$0 · solo la factura lleva IVA'));
-    if(c.ret) rows.push(r('Retención honorarios (a pagar al SII)',clp(c.ret)));
+    if(!c.ret) rows.push(r('Neto (costo)',clp(c.neto))); rows.push(r('IVA crédito fiscal',F.doc==='Factura'?clp(c.iva):'$0 · solo la factura lleva IVA'));
+    if(c.ret) rows.push(r('Honorario bruto (costo)',clp(c.neto)),r('Retención 15,25% (HH la paga al SII en el F29)',clp(c.ret)));
     rows.push(r(c.nat==='Costo directo'?'Baja el margen de':'Suma a gastos generales',c.nat==='Costo directo'?on:'gastos del mes'));
     rows.push(r('Caja de Happy Home',c.tc?'no se mueve · HH le debe '+clp(c.M)+' a '+(c.t==='socio'?F.socio:'quien pagó'):(F.pagado||c.t==='socio'?'sale ':'queda por pagar ')+clp(c.M)));
     if(c.tc) rows.push(r('Deuda con socio','se crea sola · aparece en Caja y en Socios'));
@@ -413,7 +415,7 @@ function effects(){
   }
   $('#eff').innerHTML=rows.join('');
   if(['pago','socio','cobro'].includes(c.t)&&F.doc==='Nada'&&!F.adj&&c.M) W.push('<p class="note">Sin documento: adjunta una foto o PDF del respaldo. Si no, queda marcado como "sin respaldo".</p>');
-  if(['pago','socio'].includes(c.t)&&F.doc==='Boleta de honorarios') W.push('<p class="note">Boleta de honorarios: la retención se calcula con la tasa de 2026 (15,25%). Confirmar con el contador.</p>');
+  if(['pago','socio'].includes(c.t)&&F.doc==='Boleta de honorarios') W.push(F.ret==='emisor'?'<p class="note">Retiene el emisor: se registra el total, sin deuda con el SII.</p>':'<p class="note">Se crean 2 movimientos: el pago al profesional (líquido) y la retención por pagar al SII, que queda pendiente hasta que pagues el F29.</p>');
   if(F.ndoc&&F.prov){const dup=D.movs.find(m=>(m.quien||'').toLowerCase()===F.prov.toLowerCase().trim()&&String(m.ndoc)===String(F.ndoc).trim()); if(dup) W.push(`<p class="note bad">Posible duplicado: ya existe ${esc(dup.quien)} N° ${esc(dup.ndoc)} por ${clp(dup.total)} (${fdate(dup.fecha)}). Si la factura se reparte entre obras, confirma y guarda.</p>`);}
   if(c.M){const sim=D.movs.find(m=>m.total===c.M&&(m.quien||'').toLowerCase()===F.prov.toLowerCase().trim()); if(sim&&!(F.ndoc&&String(sim.ndoc)===String(F.ndoc))) W.push(`<p class="note">Ya hay un movimiento de ${esc(sim.quien)} por el mismo monto (${fdate(sim.fecha)}). Revisa que no sea el mismo.</p>`);}
   $('#warns').innerHTML=W.join('');
@@ -430,6 +432,7 @@ async function guardar(c,t){
   const medio=F.tipo==='socio'?'Cuenta personal socio':(F.tipo==='nopago'?null:F.medio);
   const base={fecha:F.fecha||null,tipo:ing?'ingreso':'egreso',quien:(F.prov||(F.tipo==='retiro'||F.tipo==='reembsocio'||F.tipo==='socio'?F.socio:t.t)).trim(),total:c.M,neto:F.tipo==='nopago'?c.neto:(['pago','cobro','socio'].includes(F.tipo)?c.neto:c.M),iva:F.tipo==='nopago'?0:c.iva,doc:t.doc?F.doc:'Nada',ndoc:F.ndoc||null,pagado:F.tipo==='socio'?true:pag,detalle:F.detalle||null,nat,cuenta,un:['Venta','Costo directo','Recupero','Pérdida'].includes(nat)?unO:null,obra_id:c.o?c.o.id:null,medio,liga:F.liga||null};
   if(F.tipo==='cuota'&&c.interes){base.neto=c.M-c.interes;}
+  if(c.ret){base.neto=c.M; base.detalle=(base.detalle?base.detalle+' · ':'')+'líquido de boleta de honorarios (bruto '+clp(c.neto)+')';}
   let id; const extra=[];
   if(EDIT){await api.actualizar('movimientos',EDIT,base); id=EDIT;}
   else {id=(await api.insertar('movimientos',base))[0].id;}
@@ -440,6 +443,8 @@ async function guardar(c,t){
   if(c.tc&&!ing&&!EDIT){const soc=F.tipo==='socio'?F.socio:(F.medio==='TC de la casa'?'TC de la casa':F.socio);
     if(F.tipo!=='socio') await api.actualizar('movimientos',id,{pagado:true});
     nuevos.push({fecha:base.fecha,tipo:'egreso',quien:soc,total:c.M,neto:c.M,iva:0,doc:'Nada',pagado:false,detalle:'Devolver a '+soc+' lo que pagó a '+(base.quien||'—')+' ('+id+')',nat:'No afecta',cuenta:'Traspaso / pagado por socios',liga:id}); extra.push('deuda con '+soc);}
+  if(c.ret&&!EDIT) nuevos.push({fecha:base.fecha,tipo:'egreso',quien:'SII · retención honorarios',total:c.ret,neto:c.ret,iva:0,doc:'Nada',pagado:false,detalle:'Retención 15,25% de la boleta de '+base.quien+(base.ndoc?' N° '+base.ndoc:'')+' ('+id+'). Se paga en el F29.',nat:base.nat,cuenta:base.cuenta,un:base.un,obra_id:base.obra_id,liga:id});
+  if(F.tipo==='f29'&&!EDIT){const rets=D.movs.filter(m=>!m.pagado&&m.quien==='SII · retención honorarios'&&(m.fecha||'')<base.fecha); for(const m of rets) await api.actualizar('movimientos',m.id,{pagado:true,medio:'Pagado en el F29',detalle:(m.detalle||'')+' · pagada con '+id}); if(rets.length) extra.push(rets.length+' retención(es) de honorarios marcadas como pagadas');}
   if(nuevos.length) await api.insertar('movimientos',nuevos);
   if(F.tipo==='reembsocio'&&F.liga&&!EDIT){await api.actualizar('movimientos',F.liga,{pagado:true,fecha:base.fecha,detalle:((movById(F.liga)||{}).detalle||'')+' · devuelto con '+id}); extra.push(F.liga+' saldado');}
   toast((EDIT?'Corregido ':'Guardado ')+id+(extra.length?' + '+extra.join(', '):''));

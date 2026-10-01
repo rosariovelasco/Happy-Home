@@ -1,7 +1,7 @@
 // Cálculos: margen por obra, resultado mensual y caja.
 // Todo se calcula desde los movimientos; nada se guarda calculado.
 
-export const NO_BANCO = ['TC de la casa', 'Cuenta personal socio'];
+export const NO_BANCO = ['TC de la casa', 'Cuenta personal socio', 'Pagado en el F29'];
 export const DESDE = '2026-04-01'; // inicio de los datos limpios (cuadrados con el banco)
 
 const r0 = v => Math.round(v || 0);
