@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610011533';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011533';
+import * as api from './api.js?v=202610011540';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011540';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -135,9 +135,9 @@ V.obras=()=>{
   const rows=base.filter(flt).filter(o=>!qo||nrm(o.nombre+' '+(o.cliente||'')+' '+o.id+' '+(o.notas||'')).includes(qo)).map(o=>{
     const st=o.abierta?'<span class="chip open dot">En curso</span>':noCuadrada(o)?'<span class="chip bad dot">Por cuadrar</span>':'<span class="chip dot">Cerrada</span>';
     return `<tr class="click" data-obra="${o.id}"><td><b>${esc(o.nombre)}</b><br><small>${esc(o.cliente||'')}</small></td><td><span class="chip ${o.un}">${o.un}</span></td><td>${st}</td>
-    <td class="n">${clp(o.pres_neto)}</td><td class="n">${clp(o.abierta?o.costo_final:o.costo_real)}</td><td class="n ${o.margen>=0?'':'negc'}">${clp(o.margen)}</td><td class="n">${o.pres_neto||o.cobrado_neto?pct(o.margen_pct):'—'}</td><td class="n">${o.un==='Construcción'?clp(o.margen-o.cc_parte):clp(o.margen)}</td></tr>`}).join('');
+    <td class="n">${clp(o.pres_neto)}</td><td class="n">${clp(o.abierta?o.costo_final:o.costo_real)}</td><td class="n ${o.margen>=0?'':'negc'}">${clp(o.margen)}</td><td class="n">${o.pres_neto||o.cobrado_neto?pct(o.margen_pct):'—'}</td><td class="n">${o.un==='Construcción'?clp(o.margen-o.cc_parte):clp(o.margen)}</td><td class="n">${o.abierta&&o.costo_est?`<span class="${o.costo_est-o.costo_real<0?'negc':''}">${clp(o.costo_est-o.costo_real)}</span>`:'—'}</td></tr>`}).join('');
   return `<div><h1>Obras</h1><p class="sub">Margen = ventas netas − costos directos (materiales, subcontratos, fletes…). En construcción, la mitad del margen es la participación de Casa Construcción, que es costo para Happy Home. En obras en curso se usa el costo estimado mientras el gasto real no lo supere. Toca una obra para ver su ficha.</p></div>
-  <section class="card"><label style="margin-bottom:10px">Buscar obra<input id="fob" value="${esc(fob)}" placeholder="Nombre, cliente o código (busca también en obras antiguas)"></label><div class="spread" style="margin-bottom:10px"><div class="seg">${[['','Todas'],['abierta','En curso'],['cerrada','Cerradas'],['cuadrar','Por cuadrar']].map(([k,t])=>`<button type="button" data-fobr="${k}" aria-pressed="${fobr===k}">${t} <small>${obras.filter(o=>!k||(k==='abierta'?o.abierta:k==='cerrada'?(!o.abierta&&!noCuadrada(o)):(!o.abierta&&noCuadrada(o)))).length}</small></button>`).join('')}</div><div class="row solo-ros"><button class="btn" type="button" data-act="obra-new">+ Nueva obra</button><button class="btn ghost" type="button" data-go="cotizar">Desde cotización</button></div></div><div class="tbl"><table><thead><tr><th>Obra</th><th>Unidad</th><th>Estado</th><th class="n">Presupuesto neto</th><th class="n">Costo directo</th><th class="n">Margen obra</th><th class="n">%</th><th class="n">Queda para HH</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  <section class="card"><label style="margin-bottom:10px">Buscar obra<input id="fob" value="${esc(fob)}" placeholder="Nombre, cliente o código (busca también en obras antiguas)"></label><div class="spread" style="margin-bottom:10px"><div class="seg">${[['','Todas'],['abierta','En curso'],['cerrada','Cerradas'],['cuadrar','Por cuadrar']].map(([k,t])=>`<button type="button" data-fobr="${k}" aria-pressed="${fobr===k}">${t} <small>${obras.filter(o=>!k||(k==='abierta'?o.abierta:k==='cerrada'?(!o.abierta&&!noCuadrada(o)):(!o.abierta&&noCuadrada(o)))).length}</small></button>`).join('')}</div><div class="row solo-ros"><button class="btn" type="button" data-act="obra-new">+ Nueva obra</button><button class="btn ghost" type="button" data-go="cotizar">Desde cotización</button></div></div><div class="tbl"><table><thead><tr><th>Obra</th><th>Unidad</th><th>Estado</th><th class="n">Presupuesto neto</th><th class="n">Costo directo</th><th class="n">Margen obra</th><th class="n">%</th><th class="n">Queda para HH</th><th class="n">Queda para gastar</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 };
 function ficha(id){
   const o=obrasAll.find(x=>x.id===id); if(!o) return;
@@ -155,7 +155,22 @@ function ficha(id){
   </div>
   ${noCuadrada(o)?`<p class="note bad"><b>No cuadra:</b> faltan ${clp(o.descuadre)} netos entre el presupuesto y lo pagado por el cliente. Para cerrarla hay que registrar el pago que falta o declararlo como "monto no pagado por el cliente".</p>`:''}
   <div><h3>Cobro al cliente</h3><div class="bar"><i style="width:${cob}%"></i></div><div class="spread"><small class="num">${clp(o.cobrado_total)} pagado por el cliente</small><small class="num">${o.abierta?clp(o.por_cobrar)+' por cobrar':''}</small></div></div>
-  ${o.abierta&&o.avance_gasto!=null?`<div><h3>Gasto vs. costo estimado</h3><div class="bar"><i class="${o.avance_gasto>100?'bad':o.avance_gasto>85?'warn':''}" style="width:${Math.min(100,o.avance_gasto)}%"></i></div><small class="num">${pct(o.avance_gasto)} del estimado usado · quedan ${clp(o.costo_est-o.costo_real)}</small></div>`:''}
+  ${o.abierta?(()=>{const tope=o.costo_est||0; const pend=sum(D.movs.filter(m=>m.obra_id===o.id&&!m.pagado&&m.nat==='Costo directo').map(m=>m.neto)); const disp=tope-o.costo_real; const r=repartoObra(o);
+    if(!tope) return `<div class="note">Esta obra no tiene costo estimado, así que no se puede calcular cuánto queda para gastar. Ponlo en <b>Editar datos de la obra</b> (o el margen que quieren ganar).</div>`;
+    return `<div><h3>¿Cuánto queda para gastar?</h3><div class="grid g2"><div class="tbl"><table><tbody>
+     <tr><td>Presupuesto (sin IVA)</td><td class="n">${clp(o.pres_neto)}</td></tr>
+     <tr><td>− Ganancia que queremos <small>(${pct(o.pres_neto?(o.pres_neto-tope)/o.pres_neto*100:0)})</small></td><td class="n">${clp(-(o.pres_neto-tope))}</td></tr>
+     <tr class="tot"><td>= Tope de gasto</td><td class="n">${clp(tope)}</td></tr>
+     <tr><td>− Gastado a la fecha${pend?` <small>(incluye ${clp(pend)} registrados por pagar)</small>`:''}</td><td class="n">${clp(-o.costo_real)}</td></tr>
+     <tr class="tot"><td>= Queda para gastar (sin IVA)</td><td class="n ${disp<0?'negc':'pos'}">${clp(disp)}</td></tr>
+     <tr><td><small>En plata, si se compra con factura</small></td><td class="n"><small>${clp(disp*1.19)} con IVA</small></td></tr>
+    </tbody></table></div>
+    <div class="effect">
+     <div><span>Plata de la obra hoy <small>(pagado por el cliente − gastado − repartido)</small></span><b class="num ${r.cajaObra<0?'negc':''}">${clp(r.cajaObra)}</b></div>
+     <div><span>Falta que pague el cliente <small>(sin IVA)</small></span><b class="num">${clp(r.faltaCobrar)}</b></div>
+     ${disp<0?`<p class="note bad">Se pasó del tope por ${clp(-disp)}: la ganancia ya es menor a la que querían.</p>`:o.avance_gasto>85?`<p class="note">Va en ${pct(o.avance_gasto)} del tope. Ojo con los gastos que quedan.</p>`:''}
+     <p class="help">Se mide sin IVA porque el IVA de las facturas de compra lo recupera HH en el F29. El tope cambia si editas el costo estimado o el margen que quieren ganar.</p>
+    </div></div></div>`;})():''}
   <div class="tbl"><table><thead><tr><th>Costo por cuenta</th><th class="n">Neto</th></tr></thead><tbody>
    ${cuentas.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${clp(v)}</td></tr>`).join('')}
    <tr class="tot"><td>Costo directo</td><td class="n">${clp(o.costo_real)}</td></tr>
@@ -654,10 +669,15 @@ function obraForm(id){
    <label>Unidad<select id="o_u">${['Pasto','Construcción','Aseo'].map(u=>`<option ${o.un===u?'selected':''}>${u}</option>`).join('')}</select></label>
    <label>Inicio<input id="o_i" type="date" value="${o.inicio||''}"></label>
    <label>Presupuesto total con IVA<input id="o_t" inputmode="numeric" value="${o.pres_total?Math.round(o.pres_total):''}"></label>
-   <label>Costo directo estimado (neto)<input id="o_e" inputmode="numeric" value="${o.costo_est?Math.round(o.costo_est):''}"></label>
+   <label>Costo directo estimado (sin IVA)<input id="o_e" inputmode="numeric" value="${o.costo_est?Math.round(o.costo_est):''}"></label>
+   <label>o margen que quieren ganar (%)<input id="o_m" inputmode="decimal" value="${o.costo_est&&o.pres_neto?Math.round((o.pres_neto-o.costo_est)/o.pres_neto*1000)/10:''}" placeholder="Ej: 25"></label>
   </div><label>Notas<textarea id="o_no" rows="2">${esc(o.notas||'')}</textarea></label>
   <p class="help">El neto se calcula solo (total ÷ 1,19). En contratos de aseo, al facturar un mes nuevo, suma ese mes al presupuesto.</p>
   <div class="row"><button class="btn" type="button" data-act="obra-save" data-id="${id||''}">${id?'Guardar cambios':'Crear obra'}</button></div>`);
+  const sync=(src)=>{const t=+($('#o_t').value.replace(/\D/g,''))||0, n=Math.round(t/1.19); if(!n) return;
+    if(src==='m'){const m=+($('#o_m').value.replace(',','.'))||0; $('#o_e').value=Math.round(n*(1-m/100));}
+    else {const e=+($('#o_e').value.replace(/\D/g,''))||0; $('#o_m').value=e?Math.round((n-e)/n*1000)/10:'';}};
+  $('#o_m').addEventListener('input',()=>sync('m')); $('#o_e').addEventListener('input',()=>sync('e')); $('#o_t').addEventListener('input',()=>sync('m'));
 }
 async function mesSiguiente(id){
   const o=DB.obras.find(x=>x.id===id); if(!o) return;
