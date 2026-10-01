@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610011505';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011505';
+import * as api from './api.js?v=202610011509';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011509';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -164,7 +164,7 @@ function ficha(id){
    ${D.movs.filter(m=>m.obra_n===o.nombre).map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td>${esc(m.quien)}${m.detalle?`<br><small class="sub">${esc(m.detalle.slice(0,50))}</small>`:''}</td><td><span class="chip ${m.nat==='Venta'?'open':''}">${esc(m.cuenta)}</span>${!m.pagado?' <span class="chip warn">Pendiente</span>':''}</td><td class="n ${m.tipo==='ingreso'?'pos':''}">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</td></tr>`).join('')||'<tr><td colspan="4">Sin movimientos desde abril.</td></tr>'}
   </tbody></table></div><p class="help">Verde y con + : plata que entró. Con − : plata que salió. Incluye todo el historial de la obra.</p></div>
   ${o.cierre?`<div><h3>Cierre</h3><p class="sub" style="margin:0">${o.cierre.q?o.cierre.q+' '+esc(o.cierre.u)+' · '+clp(o.pres_neto/o.cierre.q)+' por '+esc(o.cierre.u)+' · ':''}${o.cierre.dias?o.cierre.dias+' días · ':''}${esc(o.cierre.apr||'')}</p></div>`:''}
-  <div class="row solo-ros"><button class="btn ghost" type="button" data-act="obra-edit" data-id="${o.id}">Editar datos de la obra</button></div>
+  <div class="row solo-ros"><button class="btn ghost" type="button" data-act="obra-edit" data-id="${o.id}">Editar datos de la obra</button>${o.un==='Aseo'?`<button class="btn ghost" type="button" data-act="mes-sig" data-id="${o.id}">Crear el mes siguiente</button>`:''}</div>
   ${o.abierta?`<div class="row solo-ros"><button class="btn" type="button" data-act="cierre" data-id="${o.id}">Cerrar obra…</button><small class="sub" style="margin:0">Revisa que todo cuadre antes de cerrarla.</small></div>`:`<p class="help">Ficha cerrada: alimenta el cotizador con costo real por partida, margen y aprendizajes.</p>`}`;
   $('#dlg').showModal();
 }
@@ -646,6 +646,15 @@ function obraForm(id){
   <p class="help">El neto se calcula solo (total ÷ 1,19). En contratos de aseo, al facturar un mes nuevo, suma ese mes al presupuesto.</p>
   <div class="row"><button class="btn" type="button" data-act="obra-save" data-id="${id||''}">${id?'Guardar cambios':'Crear obra'}</button></div>`);
 }
+async function mesSiguiente(id){
+  const o=DB.obras.find(x=>x.id===id); if(!o) return;
+  const re=new RegExp('('+MESL.join('|')+')','i'); const m=o.nombre.match(re);
+  const i=m?MESL.indexOf(m[1].toLowerCase()):-1; const sig=i>=0?MESL[(i+1)%12]:null;
+  const nombre=sig?o.nombre.replace(re,sig[0].toUpperCase()+sig.slice(1)):o.nombre+' (mes siguiente)';
+  if(DB.obras.some(x=>nrm(x.nombre)===nrm(nombre))){toast('Ya existe '+nombre);return;}
+  try{ const n=(await api.insertar('obras',{nombre,un:o.un,cliente:o.cliente,estado:'en_curso',inicio:HOY,pres_neto:o.pres_neto,pres_total:o.pres_total,costo_est:o.costo_est}))[0];
+    $('#dlg').close(); await reload('obras'); toast(nombre+' creada ('+n.id+')'); }catch(e){toast('No se pudo: '+(e.message||e));}
+}
 async function obraSave(id){
   const t=+($('#o_t').value.replace(/\D/g,''))||0;
   const row={nombre:$('#o_n').value.trim(),cliente:$('#o_c').value.trim(),un:$('#o_u').value,inicio:$('#o_i').value||null,pres_total:t,pres_neto:Math.round(t/1.19),costo_est:+($('#o_e').value.replace(/\D/g,''))||0,notas:$('#o_no').value||null};
@@ -879,6 +888,7 @@ function onClick(e){
       'ir-nopago':()=>{const o=obras.find(x=>x.id===id);EDIT=null;F={...F,tipo:'nopago',obra:id,monto:String(o.por_cobrar),liga:''};$('#dlg').close();show('nuevo');},
       'q-save':qSave,'q-ok':()=>qAprobar(+id),'q-no':()=>qRechazar(+id),anular:()=>anularMov(id),
       rapido:()=>rapido(id),'fijo-reg':()=>fijoRegistrar(+id),
+      'mes-sig':()=>mesSiguiente(id),
       'obra-new':()=>obraForm(null),'obra-edit':()=>obraForm(id),'obra-save':()=>obraSave(id||null),
       'cancel-edit':()=>{EDIT=null;F={...F,prov:'',monto:'',ndoc:'',liga:''};show('nuevo');},
       print:()=>window.print(),
