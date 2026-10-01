@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610011516';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011516';
+import * as api from './api.js?v=202610011518';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011518';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -111,8 +111,11 @@ V.inicio=()=>{
    <p class="sub" style="margin:0"><b>+ Registrar:</b> anotar un pago o cobro; muestra cómo afecta antes de guardar.</p>
   </div></details>
   <section class="card"><div class="grid g4">
-    <div class="kpi"><span>Ganancia de la empresa desde abril</span><b class="${tot.res>=0?'pos':'negc'}">${clp(tot.res)}</b><small>lo que quedó después de pagar obras y gastos fijos (${pct(tot.res/tot.v*100)} de lo vendido)</small></div>
-    <div class="kpi"><span>Lo que dejaron las obras</span><b>${clp(tot.mc)}</b><small>ventas menos costos de obra (${pct(tot.mc/tot.v*100)}), antes de gastos fijos</small></div>
+    ${(()=>{const C_=obras.filter(o=>!o.abierta), A_=obras.filter(o=>o.abierta); const sm=(L,k)=>sum(L.map(o=>o[k]||0));
+      const genHH=tot.mc-sum(obras.map(ccPendiente))-(tot.e+tot.f);
+      return `<button type="button" class="kpi kbtn" data-fobr-go="cerrada"><span>Obras cerradas (desde abril)</span><b>${clp(sm(C_,'margen'))}</b><small>margen real sin IVA de ${C_.length} obras · para HH ${clp(sm(C_,'margen_hh'))} después de CC</small><small class="ver">Ver obras →</small></button>
+    <button type="button" class="kpi kbtn" data-fobr-go="abierta"><span>Obras en curso</span><b>${clp(sm(A_,'margen'))}</b><small>margen proyectado sin IVA de ${A_.length} obras · para HH ${clp(sm(A_,'margen_hh'))}</small><small class="ver">Ver obras →</small></button>
+    <button type="button" class="kpi kbtn" data-go="reparto"><span>Ganado por HH desde abril</span><b class="${genHH>=0?'pos':'negc'}">${clp(genHH)}</b><small>lo que dejaron las obras, menos lo de CC y los gastos generales</small><small class="ver">Ver reparto →</small></button>`;})()}
     <button type="button" class="kpi kbtn" data-k="libre"><span>Plata libre hoy</span><b class="${libre>=0?'pos':'negc'}">${clp(libre)}</b><small>banco ${clp(cajaTotal)} − comprometido ${clp(cajaTotal-libre)}</small><small class="ver">Ver de dónde sale →</small></button>
     <button type="button" class="kpi kbtn" data-k="cobrar"><span>Por cobrar</span><b>${clp(porCobrar)}</b><small>lo que los clientes todavía deben pagar (con IVA)</small><small class="ver">Ver detalle →</small></button>
   </div></section>
@@ -899,6 +902,7 @@ function onClick(e){
     })[a.dataset.act]?.(); return;}
   const g=e.target.closest('[data-go]'); if(g){show(g.dataset.go);return;}
   const k=e.target.closest('[data-k]');if(k){k.dataset.k==='libre'?abrir('Plata libre hoy: de dónde sale',desgloseLibre()):abrir('Por cobrar',desgloseCobrar());return;}
+  const fg=e.target.closest('[data-fobr-go]'); if(fg){fobr=fg.dataset.fobrGo;show('obras');return;}
   const fo=e.target.closest('[data-fobr]'); if(fo){fobr=fo.dataset.fobr;show('obras');return;}
   const fc=e.target.closest('[data-fcon]'); if(fc){fcon=fc.dataset.fcon;show('conciliacion');return;}
   const pv=e.target.closest('[data-prov]'); if(pv){provDlg(pv.dataset.prov);return;}
