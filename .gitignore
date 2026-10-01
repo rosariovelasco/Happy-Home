@@ -1,0 +1,7 @@
+db/seed.json
+db/*.db
+*.bak
+node_modules/
+.env
+db/*.py
+__pycache__/
