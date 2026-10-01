@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610011518';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011518';
+import * as api from './api.js?v=202610011522';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011522';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -14,6 +14,8 @@ const fdate=s=>s?`${s.slice(8,10)}-${MES[+s.slice(5,7)-1]}`:'sin fecha';
 const sum=a=>a.reduce((x,y)=>x+y,0);
 const vals=o=>Object.values(o||{});
 const NATL=n=>n==='Estructura'?'Gastos generales':n;
+const EDOC=(m)=>({ok:m.tipo==='ingreso'?'Factura enviada':'Doc. recibido',falta:m.tipo==='ingreso'?'Falta enviar factura':'Falta factura',por_emitir:'Hacer boleta',no_aplica:'No aplica'})[m.estado_doc||'no_aplica'];
+const edocChip=m=>m.estado_doc==='falta'?` <span class="chip warn">${EDOC(m)}</span>`:m.estado_doc==='por_emitir'?' <span class="chip warn">Hacer boleta</span>':'';
 
 /* ---------- cálculos compartidos ---------- */
 let obras=[], obrasAll=[];
@@ -245,20 +247,24 @@ V.movs=()=>{
    <section class="card"><h2>Por pagar <small class="sub">${pp.length}</small></h2>${lista(pp,false)}</section>
    <section class="card"><h2>Por cobrar <small class="sub">${pc.length}</small></h2>${lista(pc,true)}<p class="help">Son cobros y reembolsos ya registrados como pendientes. El saldo por cobrar de cada obra en curso está en Caja.</p></section>
   </div>
+  ${(()=>{const L=D.movs.filter(m=>['falta','por_emitir'].includes(m.estado_doc)).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')); if(!L.length) return '';
+    const fe=L.filter(m=>m.tipo==='ingreso'), fr=L.filter(m=>m.tipo==='egreso');
+    const tb=X=>`<div class="tbl" style="max-height:320px;overflow:auto"><table><tbody>${X.map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td><b>${esc(m.quien)}</b><br><small class="sub">${esc(m.obra_n)} · ${esc(m.doc)}${m.ndoc?' N° '+esc(m.ndoc):''}</small></td><td class="n">${clp(m.total)}</td><td class="solo-ros"><button class="x" type="button" data-act="doc-ok" data-id="${m.id}">${m.tipo==='ingreso'?'Enviada':'Recibido'}</button></td></tr>`).join('')}</tbody></table></div>`;
+    return `<details class="card" style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 18px"><summary style="cursor:pointer;font-weight:600">Documentos pendientes: ${fr.length} por recibir · ${fe.length} facturas por enviar</summary><div class="grid g2" style="margin-top:10px"><div><h3>Por recibir de proveedores</h3>${fr.length?tb(fr):'<p class="sub">Nada.</p>'}</div><div><h3>Facturas por enviar a clientes</h3>${fe.length?tb(fe):'<p class="sub">Nada.</p>'}</div></div><p class="help">Vienen de la app vieja: muchos pueden estar ya resueltos. Márcalos cuando corresponda.</p></details>`;})()}
   <section class="card"><h2>Realizados</h2><div class="filters">
    <label>Buscar<input id="fq" placeholder="Proveedor, detalle, N° documento o monto" value="${esc(fq)}"></label>
    <label>Tipo<select id="fnat"><option value="">Todos</option>${nats.map(n=>`<option value="${n}" ${n===fnat?'selected':''}>${NATL(n)}</option>`).join('')}</select></label>
    <label>Obra<select id="fobra"><option value="">Todas</option>${obrasN.map(n=>`<option ${n===fobra?'selected':''}>${esc(n)}</option>`).join('')}</select></label>
-   <label>Respaldo<select id="fest"><option value="">Todos</option><option value="sin" ${fest==='sin'?'selected':''}>Sin respaldo</option></select></label>
+   <label>Documento<select id="fest"><option value="">Todos</option><option value="falta" ${fest==='falta'?'selected':''}>Falta factura / enviar</option><option value="por_emitir" ${fest==='por_emitir'?'selected':''}>Hacer boleta</option><option value="ok" ${fest==='ok'?'selected':''}>Recibido / enviado</option><option value="no_aplica" ${fest==='no_aplica'?'selected':''}>No aplica</option></select></label>
   </div><div id="movT" style="margin-top:12px"></div></section>`;
 };
 function movTable(){
   const q=fq.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''), qd=fq.replace(/\D/g,'');
-  let L=D.movs.filter(m=>m.pagado&&(!fnat||m.nat===fnat)&&(!fobra||m.obra_n===fobra)&&(fest!=='sin'||(m.doc==='Nada'&&m.tipo==='egreso'&&!m.adj))
+  let L=D.movs.filter(m=>m.pagado&&(!fnat||m.nat===fnat)&&(!fobra||m.obra_n===fobra)&&(!fest||(m.estado_doc||'no_aplica')===fest)
     &&(!q||((m.quien||'')+' '+(m.detalle||'')+' '+(m.ndoc||'')+' '+m.cuenta).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').includes(q)||(qd&&String(m.total).includes(qd))));
   const n=L.length; L=L.slice(0,150);
   $('#movT').innerHTML=`<small class="sub">${n} movimientos${n>150?' · se muestran los 150 más recientes':''}</small><div class="tbl"><table><thead><tr><th>Fecha</th><th>Quién</th><th>Qué es</th><th>Obra</th><th>Doc.</th><th class="n">Total</th><th class="n">IVA</th></tr></thead><tbody>
-  ${L.map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td>${esc(m.quien)}${m.detalle?`<br><small class="sub">${esc(m.detalle.slice(0,60))}</small>`:''}</td><td><span class="chip ${m.nat==='Venta'?'open':m.nat==='Pérdida'?'bad':''}">${esc(m.cuenta)}</span>${esFijo(m)?' <span class="chip">fijo</span>':''}${m.doc==='Nada'&&m.tipo==='egreso'&&!m.adj?' <span class="chip">sin respaldo</span>':''}</td><td><small>${esc(m.obra_n)}</small></td><td><small>${esc(m.doc)}${m.ndoc?' '+esc(m.ndoc):''}</small></td><td class="n ${m.tipo==='ingreso'?'pos':''}">${m.tipo==='ingreso'?'+':''}${clp(m.total)}</td><td class="n">${m.iva?clp(m.iva):'—'}</td></tr>`).join('')}</tbody></table></div>`;
+  ${L.map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td>${esc(m.quien)}${m.detalle?`<br><small class="sub">${esc(m.detalle.slice(0,60))}</small>`:''}</td><td><span class="chip ${m.nat==='Venta'?'open':m.nat==='Pérdida'?'bad':''}">${esc(m.cuenta)}</span>${esFijo(m)?' <span class="chip">fijo</span>':''}${edocChip(m)}</td><td><small>${esc(m.obra_n)}</small></td><td><small>${esc(m.doc)}${m.ndoc?' '+esc(m.ndoc):''}</small></td><td class="n ${m.tipo==='ingreso'?'pos':''}">${m.tipo==='ingreso'?'+':''}${clp(m.total)}</td><td class="n">${m.iva?clp(m.iva):'—'}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function rapido(id){
   const m=movById(id); if(!m) return;
@@ -356,6 +362,7 @@ function formHTML(){
   if(t.prov) h+=`<label>Cuenta<select id="f_cuenta">${['','Materiales','Subcontrato / mano de obra','Arriendo equipos y herramientas','Fletes y traslados','Retiro de escombros','Viáticos','Participación CC','Comisión de cobro','Remuneraciones y honorarios','Teléfono e internet','Vehículo y traslados','Marketing','Patentes y permisos','Otros gastos generales'].map(c=>`<option ${F.cuenta===c?'selected':''} value="${c}">${c||'(la sugiere el proveedor)'}</option>`).join('')}</select></label>`;
   if(t.obra) h+=`<label>${t.k==='retiro'?'De qué obra <small>(opcional: para el reparto)</small>':'Obra'+(t.obra==='req'?'':' <small>(obligatoria si es costo de obra)</small>')}<select id="f_obra"><option value="">${t.obra==='req'?'Elige la obra':'General HH (sin obra)'}</option>${obrasSelF().map(o=>`<option value="${o.id}" ${F.obra===o.id?'selected':''}>${esc(o.nombre)}${o.abierta?'':' (cerrada)'}</option>`).join('')}</select></label>`;
   if(t.doc) h+=`<label>Documento<select id="f_doc">${['Factura','Boleta','Boleta de honorarios','Nada'].map(d=>`<option ${F.doc===d?'selected':''}>${d}</option>`).join('')}</select></label><label>N° documento<input id="f_ndoc" value="${esc(F.ndoc)}" inputmode="numeric"></label>`;
+  if(t.doc) h+=`<label>Estado del documento<select id="f_edoc">${[['ok',t.k==='cobro'?'Factura enviada':'Recibido'],['falta',t.k==='cobro'?'Falta enviar factura':'Falta factura'],['por_emitir','Hacer boleta'],['no_aplica','No aplica']].map(([k,l])=>`<option value="${k}" ${(F.edoc||(F.doc==='Nada'?'no_aplica':'ok'))===k?'selected':''}>${l}</option>`).join('')}</select></label>`;
   if(['pago','socio'].includes(t.k)&&F.doc==='Boleta de honorarios') h+=`<label>¿Quién retiene el 15,25%?<select id="f_ret"><option value="hh" ${F.ret!=='emisor'?'selected':''}>Happy Home (la boleta dice "Impto. Retenido")</option><option value="emisor" ${F.ret==='emisor'?'selected':''}>El emisor (retención por el contribuyente)</option></select></label>`;
   h+=`<label>${['pago','socio'].includes(t.k)&&F.doc==='Boleta de honorarios'?'Monto pagado (el «Total» líquido de la boleta)':'Monto total pagado'}${t.k==='nopago'?' (con IVA, como en el presupuesto)':''}<input id="f_monto" inputmode="numeric" value="${esc(F.monto)}" placeholder="Ej: 628343"></label>`;
   if(t.k==='cuota') h+=`<label>De eso, intereses<input id="f_int" inputmode="numeric" value="${esc(F.interes)}" placeholder="Sale en la cartola del crédito"></label>`;
@@ -368,9 +375,11 @@ function formHTML(){
   $('#fm').innerHTML=h; bindForm(); effects();
 }
 function bindForm(){
-  const map={f_ret:'ret',f_prov:'prov',f_obra:'obra',f_doc:'doc',f_ndoc:'ndoc',f_monto:'monto',f_medio:'medio',f_fecha:'fecha',f_socio:'socio',f_int:'interes',f_cuenta:'cuenta',f_llego:'llego',f_det:'detalle',f_liga:'liga'};
-  const fpv=document.getElementById('f_prov'); if(fpv&&!EDIT) fpv.addEventListener('change',()=>{const k=nrm(fpv.value.trim()); if(!k) return; const u=D.movs.find(m=>m.tipo==='egreso'&&nrm(m.quien||'')===k&&m.quien!=='SII · retención honorarios'); if(u){ if(u.doc&&u.doc!==F.doc){F.doc=u.doc;} if(['pago','socio'].includes(F.tipo)&&!F.cuenta) F.cuenta=u.cuenta; formHTML(); toast('Documento y cuenta de la última vez: '+u.doc+' · '+u.cuenta);}});
-  const fd=document.getElementById('f_doc'); if(fd) fd.addEventListener('change',()=>{F.doc=fd.value; formHTML();});
+  const map={f_edoc:'edoc',f_ret:'ret',f_prov:'prov',f_obra:'obra',f_doc:'doc',f_ndoc:'ndoc',f_monto:'monto',f_medio:'medio',f_fecha:'fecha',f_socio:'socio',f_int:'interes',f_cuenta:'cuenta',f_llego:'llego',f_det:'detalle',f_liga:'liga'};
+  const fpv=document.getElementById('f_prov'); if(fpv&&!EDIT) fpv.addEventListener('change',()=>{const k=nrm(fpv.value.trim()); if(!k) return; const u=D.movs.find(m=>m.tipo==='egreso'&&nrm(m.quien||'')===k&&m.quien!=='SII · retención honorarios'); if(u){ const cambioDoc=u.doc&&u.doc!==F.doc; if(cambioDoc){F.doc=u.doc; F.edoc='';} if(['pago','socio'].includes(F.tipo)&&!F.cuenta) F.cuenta=u.cuenta;
+      setTimeout(()=>{const foco=document.activeElement&&document.activeElement.id; if(cambioDoc) formHTML(); else {const c=document.getElementById('f_cuenta'); if(c) c.value=F.cuenta; effects();} if(foco&&document.getElementById(foco)) document.getElementById(foco).focus();},0);
+      toast('Documento y cuenta de la última vez: '+u.doc+' · '+u.cuenta);}});
+  const fd=document.getElementById('f_doc'); if(fd) fd.addEventListener('change',()=>{F.doc=fd.value; F.edoc=fd.value==='Nada'?'no_aplica':''; formHTML();});
   const pg=document.getElementById('f_pag'); if(pg) pg.addEventListener('input',()=>{F.pagado=pg.value==='1'; effects();});
   const lg=document.getElementById('f_liga'); if(lg) lg.addEventListener('change',()=>{const m=movById(lg.value); if(m){F.monto=String(m.total); F.socio=/max/i.test(m.quien)?'Max':'Rosario'; formHTML();}});
   Object.entries(map).forEach(([id,k])=>{const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{F[k]=el.value; if(k==='prov'){const p=D.proveedores[titleCase(el.value)]; if(p&&!F.cuenta){ /* sugerencia */ }} effects();})});
@@ -438,7 +447,7 @@ async function guardar(c,t){
   const pag=['pago','cobro','reemb'].includes(F.tipo)?F.pagado:(F.tipo!=='socio');
   const unO=c.o?c.o.un:null;
   const medio=F.tipo==='socio'?'Cuenta personal socio':(F.tipo==='nopago'?null:F.medio);
-  const base={fecha:F.fecha||null,tipo:ing?'ingreso':'egreso',quien:(F.prov||(F.tipo==='retiro'||F.tipo==='reembsocio'||F.tipo==='socio'?F.socio:t.t)).trim(),total:c.M,neto:F.tipo==='nopago'?c.neto:(['pago','cobro','socio'].includes(F.tipo)?c.neto:c.M),iva:F.tipo==='nopago'?0:c.iva,doc:t.doc?F.doc:'Nada',ndoc:F.ndoc||null,pagado:F.tipo==='socio'?true:pag,detalle:F.detalle||null,nat,cuenta,un:['Venta','Costo directo','Recupero','Pérdida'].includes(nat)?unO:null,obra_id:c.o?c.o.id:null,medio,liga:F.liga||null};
+  const base={fecha:F.fecha||null,tipo:ing?'ingreso':'egreso',quien:(F.prov||(F.tipo==='retiro'||F.tipo==='reembsocio'||F.tipo==='socio'?F.socio:t.t)).trim(),total:c.M,neto:F.tipo==='nopago'?c.neto:(['pago','cobro','socio'].includes(F.tipo)?c.neto:c.M),iva:F.tipo==='nopago'?0:c.iva,doc:t.doc?F.doc:'Nada',ndoc:F.ndoc||null,pagado:F.tipo==='socio'?true:pag,detalle:F.detalle||null,estado_doc:t.doc?(F.edoc||(F.doc==='Nada'?'no_aplica':'ok')):'no_aplica',nat,cuenta,un:['Venta','Costo directo','Recupero','Pérdida'].includes(nat)?unO:null,obra_id:c.o?c.o.id:null,medio,liga:F.liga||null};
   if(F.tipo==='cuota'&&c.interes){base.neto=c.M-c.interes;}
   if(c.ret){base.neto=c.M; base.detalle=(base.detalle?base.detalle+' · ':'')+'líquido de boleta de honorarios (bruto '+clp(c.neto)+')';}
   let id; const extra=[];
@@ -456,7 +465,7 @@ async function guardar(c,t){
   if(nuevos.length) await api.insertar('movimientos',nuevos);
   if(F.tipo==='reembsocio'&&F.liga&&!EDIT){await api.actualizar('movimientos',F.liga,{pagado:true,fecha:base.fecha,detalle:((movById(F.liga)||{}).detalle||'')+' · devuelto con '+id}); extra.push(F.liga+' saldado');}
   toast((EDIT?'Corregido ':'Guardado ')+id+(extra.length?' + '+extra.join(', '):''));
-  EDIT=null; F={...F,prov:'',ndoc:'',monto:'',interes:'',adj:false,cuenta:'',llego:'',detalle:'',liga:'',pagado:true};
+  EDIT=null; F={...F,prov:'',ndoc:'',monto:'',interes:'',adj:false,cuenta:'',llego:'',detalle:'',liga:'',pagado:true,edoc:''};
   await reload('nuevo');
   }catch(e){console.error(e); toast('No se pudo guardar: '+(e.message||e));}
   finally{GUARDANDO=false;}
@@ -494,7 +503,7 @@ function movDlg(id){
     <dt>Obra</dt><dd>${o?`<a href="#" data-obra="${o.id}">${esc(m.obra_n)}</a>`:esc(m.obra_n)}</dd>
     <dt>Naturaleza</dt><dd>${esc(m.nat)} · ${esc(m.cuenta)}</dd>
     <dt>Medio</dt><dd>${esc(m.medio||'—')}</dd>
-    <dt>Documento</dt><dd>${esc(m.doc)}${m.ndoc?' N° '+esc(m.ndoc):''}</dd>
+    <dt>Documento</dt><dd>${esc(m.doc)}${m.ndoc?' N° '+esc(m.ndoc):''} · <b>${EDOC(m)}</b>${['falta','por_emitir'].includes(m.estado_doc)?` <button class="x solo-ros" type="button" data-act="doc-ok" data-id="${m.id}">Marcar ${m.tipo==='ingreso'?'enviada':'recibido'}</button>`:''}</dd>
     <dt>Neto / IVA</dt><dd class="num">${clp(m.neto)} / ${clp(m.iva)}</dd>
     <dt>Detalle</dt><dd>${esc(m.detalle||'—')}</dd>
     ${(()=>{const l=m.liga&&m.liga!==m.id?movById(m.liga):null; const hijos=D.movs.filter(x=>x.liga===m.id&&x.id!==m.id); return (l?`<dt>Ligado a</dt><dd><a href="#" data-mov="${l.id}">${l.id} · ${esc(l.quien)} ${clp(l.total)}</a> <small class="sub">(${esc(l.obra_n)})</small></dd>`:'')+(hijos.length?`<dt>Relacionados</dt><dd>${hijos.map(h=>`<a href="#" data-mov="${h.id}">${h.id} · ${esc(h.quien)} ${clp(h.total)}</a>`).join('<br>')}</dd>`:'');})()}
@@ -528,7 +537,7 @@ let EDIT=null;
 function editarMov(id){
   const m=movById(id); if(!m) return; EDIT=id;
   const o=obraDe(m);
-  F={...F,socio:/max/i.test(m.quien||'')?'Max':'Rosario',tipo:m.medio==='Cuenta personal socio'&&m.tipo==='egreso'?'socio':(m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso')?'reembsocio':TIPO_DE[m.nat]||(m.cuenta==='Retiro de socio'?'retiro':m.cuenta==='Pago F29 (IVA)'?'f29':m.cuenta==='Cuota de crédito'?'cuota':'traspaso'),prov:m.quien||'',obra:o?o.id:'',doc:['Nada','Factura','Boleta','Boleta de honorarios'].includes(m.doc)?m.doc:'Nada',ret:'hh',ndoc:m.ndoc||'',monto:String(m.total),fecha:m.fecha||HOY,cuenta:F.tipo==='pago'?'':'',pagado:m.pagado,llego:'',medio:m.medio||F.medio,detalle:m.detalle||'',liga:m.liga||''};
+  F={...F,socio:/max/i.test(m.quien||'')?'Max':'Rosario',tipo:m.medio==='Cuenta personal socio'&&m.tipo==='egreso'?'socio':(m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso')?'reembsocio':TIPO_DE[m.nat]||(m.cuenta==='Retiro de socio'?'retiro':m.cuenta==='Pago F29 (IVA)'?'f29':m.cuenta==='Cuota de crédito'?'cuota':'traspaso'),prov:m.quien||'',obra:o?o.id:'',doc:['Nada','Factura','Boleta','Boleta de honorarios'].includes(m.doc)?m.doc:'Nada',ret:'hh',edoc:m.estado_doc||'',ndoc:m.ndoc||'',monto:String(m.total),fecha:m.fecha||HOY,cuenta:F.tipo==='pago'?'':'',pagado:m.pagado,llego:'',medio:m.medio||F.medio,detalle:m.detalle||'',liga:m.liga||''};
   if(['pago','socio'].includes(F.tipo)) F.cuenta=m.cuenta;
   $('#dlg').close(); show('nuevo');
 }
@@ -893,6 +902,7 @@ function onClick(e){
       'q-save':qSave,'q-ok':()=>qAprobar(+id),'q-no':()=>qRechazar(+id),anular:()=>anularMov(id),
       rapido:()=>rapido(id),'fijo-reg':()=>fijoRegistrar(+id),
       'mes-sig':()=>mesSiguiente(id),
+      'doc-ok':async()=>{try{await api.actualizar('movimientos',id,{estado_doc:'ok'}); const op=$('#dlg').open; if(op) $('#dlg').close(); await reload(); toast('Documento marcado');}catch(e){toast('No se pudo: '+(e.message||e));}},
       'ob-reg':()=>{EDIT=null; F={...F,tipo:a.dataset.t,obra:id,prov:'',monto:'',ndoc:'',detalle:'',liga:'',cuenta:'',llego:'',pagado:true,fecha:HOY}; $('#dlg').close(); show('nuevo'); toast('Registrando en '+((obrasAll.find(o=>o.id===id)||{}).nombre||id));},
       'obra-new':()=>obraForm(null),'obra-edit':()=>obraForm(id),'obra-save':()=>obraSave(id||null),
       'cancel-edit':()=>{EDIT=null;F={...F,prov:'',monto:'',ndoc:'',liga:''};show('nuevo');},
