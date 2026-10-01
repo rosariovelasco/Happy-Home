@@ -12,22 +12,22 @@ export function calcObras(obrasDB, movs) {
   const out = [];
   for (const o of obrasDB) {
     const L = by[o.id] || [];
-    let cobrado_neto = 0, cobrado_total = 0, costo = 0, recupero = 0, perdida = 0, part_cc = 0, por_cobrar_mov = 0, por_pagar = 0, ult = null;
+    let cobrado_neto = 0, cobrado_total = 0, costo = 0, recupero = 0, perdida = 0, part_cc = 0, part_cc_total = 0, por_cobrar_mov = 0, por_pagar = 0, ult = null, costo_bruto = 0, recupero_bruto = 0;
     const cuentas = {};
     for (const m of L) {
       const neto = +m.neto || 0;
       if (m.fecha && (!ult || m.fecha > ult)) ult = m.fecha;
       if (!m.pagado) {
         if (m.nat === 'Venta') por_cobrar_mov += +m.total;
-        else if (m.nat === 'Costo directo') { por_pagar += +m.total; costo += neto; cuentas[m.cuenta] = (cuentas[m.cuenta] || 0) + neto; }
+        else if (m.nat === 'Costo directo') { por_pagar += +m.total; costo += neto; costo_bruto += +m.total; cuentas[m.cuenta] = (cuentas[m.cuenta] || 0) + neto; }
         else if (m.nat === 'Pérdida' && m.tipo === 'ingreso') perdida += neto;
         continue;
       }
       if (m.nat === 'Venta') { cobrado_neto += neto; cobrado_total += +m.total; }
       else if (m.nat === 'Costo directo') {
-        if (m.cuenta === 'Participación CC') part_cc += neto;
-        else { costo += neto; cuentas[m.cuenta] = (cuentas[m.cuenta] || 0) + neto; }
-      } else if (m.nat === 'Recupero') { recupero += neto; cuentas['(−) Reembolsos y devoluciones'] = (cuentas['(−) Reembolsos y devoluciones'] || 0) - neto; }
+        if (m.cuenta === 'Participación CC') { part_cc += neto; part_cc_total += +m.total; }
+        else { costo += neto; costo_bruto += +m.total; cuentas[m.cuenta] = (cuentas[m.cuenta] || 0) + neto; }
+      } else if (m.nat === 'Recupero') { recupero += neto; recupero_bruto += +m.total; cuentas['(−) Reembolsos y devoluciones'] = (cuentas['(−) Reembolsos y devoluciones'] || 0) - neto; }
       else if (m.nat === 'Pérdida') perdida += neto;
     }
     const abierta = o.estado === 'en_curso';
@@ -50,7 +50,7 @@ export function calcObras(obrasDB, movs) {
       por_cobrar: abierta ? r0(Math.max(0, o.pres_total - cobrado_total)) : r0(por_cobrar_mov),
       costo_real: r0(costoN), costo_final: r0(costo_final), perdida: r0(perdida), margen: r0(margen),
       margen_pct: base_ing ? Math.round(margen / base_ing * 1000) / 10 : 0,
-      cc_parte: cc, cc_pagado: r0(part_cc), margen_hh: r0(margen - cc), por_pagar: r0(por_pagar),
+      cc_parte: cc, cc_pagado: r0(part_cc), cc_pagado_total: r0(part_cc_total), costo_con_iva: r0(costo_bruto - recupero_bruto), margen_hh: r0(margen - cc), por_pagar: r0(por_pagar),
       cuentas: Object.fromEntries(Object.entries(cuentas).map(([k, v]) => [k, r0(v)]).sort((a, b) => b[1] - a[1])),
       n_movs: L.length, avance_gasto: +o.costo_est ? Math.round(costoN / o.costo_est * 1000) / 10 : null,
       descuadre: abierta ? 0 : r0(o.pres_neto - base_ing - perdida),

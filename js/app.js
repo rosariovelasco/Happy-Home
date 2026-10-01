@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610011343';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011343';
+import * as api from './api.js?v=202610011448';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011448';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -23,13 +23,15 @@ function ccPendiente(o){
   const share = o.abierta ? o.cc_parte*(o.pres_neto? o.cobrado_neto/o.pres_neto:0) : o.cc_parte;
   return Math.max(0,Math.round(share-o.cc_pagado));
 }
+// plata real: lo que hay que transferir a CC (CC factura su participación: +19% IVA, que HH recupera en el F29)
+const ccPlata=o=>Math.round(ccPendiente(o)*1.19);
 let R={}, meses=[];
 function mesTot(m){const r=R[m];const v=sum(vals(r.ventas)),d=sum(vals(r.directo)),e=sum(vals(r.estructura));return {v,d,mc:v-d,e,f:r.financiero,res:v-d-e-r.financiero}}
 let tot, C, cajaTotal, ivaPagar;
 let pagosPend,ccPend,colchon,libre,porCobrarObras,cobrosExtra,porCobrar;
 function recalc(){
   pagosPend=sum(C.pend_pagos.map(p=>p.total));
-  ccPend=sum(obras.map(ccPendiente));
+  ccPend=sum(obras.map(ccPlata));
   colchon=C.estructura_prom;
   libre=cajaTotal-ivaPagar-pagosPend-ccPend-colchon;
   porCobrarObras=obras.filter(o=>o.abierta).map(o=>({o,monto:o.por_cobrar})).filter(x=>x.monto>0);
@@ -65,9 +67,8 @@ async function reload(v){
 /* ---------- desglose de plata libre y por cobrar ---------- */
 function ccExplica(o){
   const pc=o.pres_neto? o.cobrado_neto/o.pres_neto:0;
-  return o.abierta
-   ? `50% del margen proyectado (${clp(o.margen)}) = ${clp(o.cc_parte)} × ${pct(pc*100)} cobrado = ${clp(Math.round(o.cc_parte*pc))}${o.cc_pagado?` − ya pagado ${clp(o.cc_pagado)}`:''}`
-   : `50% del margen real (${clp(o.margen)}) = ${clp(o.cc_parte)}${o.cc_pagado?` − ya pagado ${clp(o.cc_pagado)}`:''}`;
+  const ganado=Math.round((o.abierta?o.cc_parte*pc:o.cc_parte)*1.19);
+  return `${o.abierta?'Le corresponde por lo cobrado ('+pct(pc*100)+')':'Le corresponde'}: ${clp(ganado)} con IVA${o.cc_pagado_total?` − ya transferido ${clp(o.cc_pagado_total)}`:''} = ${clp(ccPlata(o))}. De eso, ${clp(ccPlata(o)-ccPendiente(o))} es IVA de su factura, que HH recupera en el F29.`;
 }
 function desgloseLibre(){
   const ccObras=obras.filter(o=>ccPendiente(o)>0);
@@ -76,7 +77,7 @@ function desgloseLibre(){
   return `<div class="tbl"><table><tbody>
    ${sec('Plata en el banco',cajaTotal, C.cuentas.map(c=>sub(esc(c.nombre),'según cartola al '+fdate(c.fecha),c.saldo)).join('')+(C.nDesde?sub('Pagos y cobros registrados después de la cartola',C.nDesde+' movimientos',C.movDesde):''))}
    ${sec('− Pagos pendientes a proveedores',-pagosPend, C.pend_pagos.map(p=>sub(`<b>${esc(p.quien)}</b> · ${esc(p.obra)}`,`${esc(p.detalle||'')} · ${p.fecha?'registrado '+fdate(p.fecha):'<span class="negc">sin fecha</span>'} · ${p.id}`,-p.total,p.id)).join(''))}
-   ${sec('− Participación Casa Construcción por pagar (estimada)',-ccPend, ccObras.map(o=>sub(`<b>${esc(o.nombre)}</b>`,ccExplica(o),-ccPendiente(o))).join(''))}
+   ${sec('− Participación Casa Construcción por transferir (estimada, con IVA)',-ccPend, ccObras.map(o=>sub(`<b>${esc(o.nombre)}</b>`,ccExplica(o),-ccPlata(o))).join(''))}
    ${sec('− IVA por pagar en el F29 de este mes',-ivaPagar, sub('IVA débito '+MESL[+C.mesAnt.slice(5)-1]+' (ventas)','',C.iva_debito)+sub('IVA crédito '+MESL[+C.mesAnt.slice(5)-1]+' (compras)',C.iva_debito-C.iva_credito<0?'más crédito que débito: el F29 sale en cero y queda remanente a favor':'',-C.iva_credito)+(C.f29_pagado?sub('F29 ya pagado este mes','',C.f29_pagado):''))}
    ${sec('− Colchón: 1 mes de gastos fijos',-colchon, sub('Promedio mensual de gastos generales (últimos 6 meses)','contador, Previred, Entel, TAG, seguros, etc. Se guarda para no quedar sin pagar el mes',-colchon))}
    <tr class="tot"><td>= Plata libre</td><td class="n ${libre>=0?'pos':'negc'}">${clp(libre)}</td></tr>
@@ -96,7 +97,7 @@ const V={};
 V.inicio=()=>{
   const alerts=[];
   obras.filter(noCuadrada).forEach(o=>alerts.push(`<li><span class="chip bad">Por cuadrar</span><span><b>${esc(o.nombre)}</b>: la diferencia entre presupuesto y lo cobrado es de ${clp(o.descuadre)} neto. No se puede cerrar hasta cobrarlo o declararlo como no pagado.</span></li>`));
-  obras.filter(o=>ccPendiente(o)>0).forEach(o=>alerts.push(`<li><span class="chip warn">Casa Construcción</span><span><b>${esc(o.nombre)}</b>: le corresponden ${clp(ccPendiente(o))} más de participación${o.abierta?' sobre lo ya cobrado (estimado)':''}.</span></li>`));
+  obras.filter(o=>ccPendiente(o)>0).forEach(o=>alerts.push(`<li><span class="chip warn">Casa Construcción</span><span><b>${esc(o.nombre)}</b>: le faltan por transferir ${clp(ccPlata(o))} (con IVA) de participación${o.abierta?' sobre lo ya cobrado (estimado)':''}.</span></li>`));
   C.pend_pagos.forEach(p=>alerts.push(`<li><span class="chip warn">Por pagar</span><span><b>${esc(p.quien)}</b> ${clp(p.total)} · ${esc(p.obra)} · ${fdate(p.fecha)}</span></li>`));
   const open=obras.filter(o=>o.abierta);
   return `<div><h1>Cómo va Happy Home</h1><p class="sub">Desde abril 2026 (datos cuadrados con el banco).</p></div>
@@ -141,7 +142,7 @@ function ficha(id){
   $('#dlgB').innerHTML=`
   <div class="grid g4">
    <div class="kpi"><span>Presupuesto neto</span><b>${clp(o.pres_neto)}</b><small>${clp(o.pres_total)} con IVA</small></div>
-   <div class="kpi"><span>${o.abierta?'Gastado a la fecha':'Costo directo'}</span><b>${clp(o.costo_real)}</b><small>${o.abierta&&o.costo_est?'de un costo estimado de '+clp(o.costo_est)+' · ':''}neto, sin Casa Construcción, menos reembolsos</small></div>
+   <div class="kpi"><span>${o.abierta?'Gastado a la fecha':'Costo directo'}</span><b>${clp(o.costo_real)}</b><small>${o.abierta&&o.costo_est?'de un costo estimado de '+clp(o.costo_est)+' · ':''}sin IVA · con IVA ${clp(o.costo_con_iva)} · sin Casa Construcción, menos reembolsos</small></div>
    <div class="kpi"><span>Margen ${o.abierta?'proyectado':'real'}</span><b class="${o.margen>=0?'pos':'negc'}">${clp(o.margen)}</b><small>${pct(o.margen_pct)}${o.abierta?' · presupuesto − '+(o.costo_final>o.costo_real?'costo estimado':'gastado'):''}</small></div>
    ${cc?`<div class="kpi"><span>Queda para Happy Home</span><b>${clp(o.margen-o.cc_parte)}</b><small>después de Casa Construcción</small></div>`:`<div class="kpi"><span>Cobrado</span><b>${clp(o.cobrado_total)}</b><small>con IVA</small></div>`}
   </div>
@@ -153,10 +154,11 @@ function ficha(id){
    <tr class="tot"><td>Costo directo</td><td class="n">${clp(o.costo_real)}</td></tr>
    ${o.perdida?`<tr><td>Monto no pagado por el cliente</td><td class="n negc">${clp(o.perdida)}</td></tr>`:''}
   </tbody></table></div>
-  ${cc?`<div class="tbl"><table><thead><tr><th>Casa Construcción (50% del margen)</th><th class="n">Monto</th></tr></thead><tbody>
-    <tr><td>Participación total ${o.abierta?'proyectada':''}</td><td class="n">${clp(o.cc_parte)}</td></tr>
-    <tr><td>Pagado</td><td class="n">${clp(o.cc_pagado)}</td></tr>
-    <tr class="tot"><td>${ccPendiente(o)>0?'Por pagar'+(o.abierta?' sobre lo cobrado (estimado)':''):'Diferencia'}</td><td class="n">${clp(ccPendiente(o)>0?ccPendiente(o):o.cc_parte-o.cc_pagado)}</td></tr></tbody></table></div>`:''}
+  ${cc?(()=>{const pc=o.pres_neto?o.cobrado_neto/o.pres_neto:0; const gan=o.abierta?Math.round(o.cc_parte*pc):o.cc_parte; return `<div class="tbl"><table><thead><tr><th>Casa Construcción (50% del margen)</th><th class="n">Sin IVA</th><th class="n">Plata real (con IVA)</th></tr></thead><tbody>
+    <tr><td>Participación total ${o.abierta?'proyectada':''}</td><td class="n">${clp(o.cc_parte)}</td><td class="n">${clp(o.cc_parte*1.19)}</td></tr>
+    ${o.abierta?`<tr><td>Le corresponde por lo cobrado (${pct(pc*100)})</td><td class="n">${clp(gan)}</td><td class="n">${clp(gan*1.19)}</td></tr>`:''}
+    <tr><td>Ya transferido</td><td class="n">${clp(o.cc_pagado)}</td><td class="n">${clp(o.cc_pagado_total)}</td></tr>
+    <tr class="tot"><td>Falta transferir${o.abierta?' (estimado)':''}</td><td class="n">${clp(ccPendiente(o))}</td><td class="n">${clp(ccPlata(o))}</td></tr></tbody></table></div><p class="help">CC factura su participación: de lo que le transfieres, el IVA lo recupera HH en el F29.</p>`;})():''}
   <div><h3>Movimientos de esta obra</h3><div class="tbl"><table><thead><tr><th>Fecha</th><th>Quién</th><th>Qué es</th><th class="n">Monto</th></tr></thead><tbody>
    ${D.movs.filter(m=>m.obra_n===o.nombre).map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td>${esc(m.quien)}${m.detalle?`<br><small class="sub">${esc(m.detalle.slice(0,50))}</small>`:''}</td><td><span class="chip ${m.nat==='Venta'?'open':''}">${esc(m.cuenta)}</span>${!m.pagado?' <span class="chip warn">Pendiente</span>':''}</td><td class="n ${m.tipo==='ingreso'?'pos':''}">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</td></tr>`).join('')||'<tr><td colspan="4">Sin movimientos desde abril.</td></tr>'}
   </tbody></table></div><p class="help">Verde y con + : plata que entró. Con − : plata que salió. Incluye todo el historial de la obra.</p></div>
@@ -702,8 +704,8 @@ V.socios=()=>{
    ${who.map(w=>`<tr class="tot"><td colspan="2">Total ${esc(w)}</td><td class="n">${clp(sum(ret.filter(m=>first(m.quien)===w).map(m=>m.total)))}</td></tr>`).join('')}</tbody></table></div>
    <p class="help">Plata libre hoy: <b class="num ${libre<0?'negc':''}">${clp(libre)}</b>. Al registrar un retiro mayor, la app avisa.</p></section>
   </div>
-  <section class="card"><h2>Casa Construcción: participación por obra</h2><div class="tbl"><table><thead><tr><th>Obra</th><th>Estado</th><th class="n">Margen</th><th class="n">50% para CC</th><th class="n">Pagado</th><th class="n">Por pagar (estimado)</th></tr></thead><tbody>
-   ${cc.map(o=>`<tr class="click" data-obra="${o.id}"><td>${esc(o.nombre)}</td><td>${o.abierta?'<span class="chip open">En curso</span>':noCuadrada(o)?'<span class="chip bad">Por cuadrar</span>':'<span class="chip">Cerrada</span>'}</td><td class="n">${clp(o.margen)}</td><td class="n">${clp(o.cc_parte)}</td><td class="n">${clp(o.cc_pagado)}</td><td class="n">${ccPendiente(o)?clp(ccPendiente(o)):'—'}</td></tr>`).join('')}
+  <section class="card"><h2>Casa Construcción: participación por obra</h2><div class="tbl"><table><thead><tr><th>Obra</th><th>Estado</th><th class="n">Margen (sin IVA)</th><th class="n">50% para CC (sin IVA)</th><th class="n">Ya transferido</th><th class="n">Falta transferir (con IVA)</th></tr></thead><tbody>
+   ${cc.map(o=>`<tr class="click" data-obra="${o.id}"><td>${esc(o.nombre)}</td><td>${o.abierta?'<span class="chip open">En curso</span>':noCuadrada(o)?'<span class="chip bad">Por cuadrar</span>':'<span class="chip">Cerrada</span>'}</td><td class="n">${clp(o.margen)}</td><td class="n">${clp(o.cc_parte)}</td><td class="n">${clp(o.cc_pagado_total)}</td><td class="n">${ccPendiente(o)?clp(ccPlata(o)):'—'}</td></tr>`).join('')}
    <tr class="tot"><td colspan="5">Total por pagar</td><td class="n">${clp(ccPend)}</td></tr></tbody></table></div>
    <p class="help"><b>Decisión pendiente:</b> en obras en curso, ¿la participación se paga sobre lo cobrado, por estado de pago o al cierre? Hoy se estima sobre lo cobrado.</p></section>`;
 };
@@ -813,7 +815,7 @@ $('#glosBtn').addEventListener('click',()=>{$('#dlgT').innerHTML='<h2 style="mar
 <dt>Margen de contribución</dt><dd>Ventas netas menos costos directos. Es lo que dejan las obras para pagar los gastos generales y ganar.</dd>
 <dt>No afecta el resultado</dt><dd>Plata que entra o sale pero no es venta ni costo: retiros de socios, pago del F29 (el IVA es del SII), capital de créditos, traspasos y compra de activos.</dd>
 <dt>Plata libre</dt><dd>Lo que hay en el banco menos lo que ya está comprometido: IVA, pagos pendientes, Casa Construcción y un mes de gastos generales. Es lo único que se puede retirar.</dd>
-<dt>Neto e IVA</dt><dd>Solo la factura separa IVA (19%). Boleta o sin documento: el neto es el total.</dd>
+<dt>Sin IVA y con IVA</dt><dd>Márgenes, ventas y costos de obra se miden sin IVA, porque el IVA no es ganancia ni costo: es del SII. Todo lo que es plata que entra o sale (caja, plata libre, pendientes, lo que se le transfiere a CC) se muestra con IVA, que es la plata real. Solo la factura separa IVA (19%).</dd>
 <dt>Punto de equilibrio</dt><dd>Venta mensual mínima para no perder: gastos generales del mes ÷ % de margen de contribución.</dd></dl>`;$('#dlg').showModal();});
 /* ---------- inicio de sesión ---------- */
 async function iniciar(){
