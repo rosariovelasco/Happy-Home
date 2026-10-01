@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610011502';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011502';
+import * as api from './api.js?v=202610011505';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011505';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -123,15 +123,16 @@ V.inicio=()=>{
     <section class="card"><h2>Requiere atención</h2><ul class="alerts">${alerts.join('')||'<li>Nada pendiente.</li>'}</ul></section>
   </div>`;
 };
-let fobr='';
+let fobr='', fob='';
 V.obras=()=>{
   const flt=o=>!fobr||(fobr==='abierta'?o.abierta:fobr==='cerrada'?(!o.abierta&&!noCuadrada(o)):(!o.abierta&&noCuadrada(o)));
-  const rows=obras.filter(flt).map(o=>{
+  const qo=nrm(fob.trim()); const base=qo?obrasAll:obras;
+  const rows=base.filter(flt).filter(o=>!qo||nrm(o.nombre+' '+(o.cliente||'')+' '+o.id+' '+(o.notas||'')).includes(qo)).map(o=>{
     const st=o.abierta?'<span class="chip open dot">En curso</span>':noCuadrada(o)?'<span class="chip bad dot">Por cuadrar</span>':'<span class="chip dot">Cerrada</span>';
     return `<tr class="click" data-obra="${o.id}"><td><b>${esc(o.nombre)}</b><br><small>${esc(o.cliente||'')}</small></td><td><span class="chip ${o.un}">${o.un}</span></td><td>${st}</td>
     <td class="n">${clp(o.pres_neto)}</td><td class="n">${clp(o.abierta?o.costo_final:o.costo_real)}</td><td class="n ${o.margen>=0?'':'negc'}">${clp(o.margen)}</td><td class="n">${o.pres_neto||o.cobrado_neto?pct(o.margen_pct):'—'}</td><td class="n">${o.un==='Construcción'?clp(o.margen-o.cc_parte):clp(o.margen)}</td></tr>`}).join('');
   return `<div><h1>Obras</h1><p class="sub">Margen = ventas netas − costos directos (materiales, subcontratos, fletes…). En construcción, la mitad del margen es la participación de Casa Construcción, que es costo para Happy Home. En obras en curso se usa el costo estimado mientras el gasto real no lo supere. Toca una obra para ver su ficha.</p></div>
-  <section class="card"><div class="spread" style="margin-bottom:10px"><div class="seg">${[['','Todas'],['abierta','En curso'],['cerrada','Cerradas'],['cuadrar','Por cuadrar']].map(([k,t])=>`<button type="button" data-fobr="${k}" aria-pressed="${fobr===k}">${t} <small>${obras.filter(o=>!k||(k==='abierta'?o.abierta:k==='cerrada'?(!o.abierta&&!noCuadrada(o)):(!o.abierta&&noCuadrada(o)))).length}</small></button>`).join('')}</div><div class="row solo-ros"><button class="btn" type="button" data-act="obra-new">+ Nueva obra</button><button class="btn ghost" type="button" data-go="cotizar">Desde cotización</button></div></div><div class="tbl"><table><thead><tr><th>Obra</th><th>Unidad</th><th>Estado</th><th class="n">Presupuesto neto</th><th class="n">Costo directo</th><th class="n">Margen obra</th><th class="n">%</th><th class="n">Queda para HH</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  <section class="card"><label style="margin-bottom:10px">Buscar obra<input id="fob" value="${esc(fob)}" placeholder="Nombre, cliente o código (busca también en obras antiguas)"></label><div class="spread" style="margin-bottom:10px"><div class="seg">${[['','Todas'],['abierta','En curso'],['cerrada','Cerradas'],['cuadrar','Por cuadrar']].map(([k,t])=>`<button type="button" data-fobr="${k}" aria-pressed="${fobr===k}">${t} <small>${obras.filter(o=>!k||(k==='abierta'?o.abierta:k==='cerrada'?(!o.abierta&&!noCuadrada(o)):(!o.abierta&&noCuadrada(o)))).length}</small></button>`).join('')}</div><div class="row solo-ros"><button class="btn" type="button" data-act="obra-new">+ Nueva obra</button><button class="btn ghost" type="button" data-go="cotizar">Desde cotización</button></div></div><div class="tbl"><table><thead><tr><th>Obra</th><th>Unidad</th><th>Estado</th><th class="n">Presupuesto neto</th><th class="n">Costo directo</th><th class="n">Margen obra</th><th class="n">%</th><th class="n">Queda para HH</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 };
 function ficha(id){
   const o=obrasAll.find(x=>x.id===id); if(!o) return;
@@ -828,6 +829,33 @@ V.reporte=()=>{
   <section class="card"><h2>En qué se fueron los gastos fijos</h2><div class="tbl"><table><tbody>${top.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${clp(v)}</td></tr>`).join('')}</tbody></table></div></section>`;
 };
 
+
+/* ---------- buscador global ---------- */
+const montoQ=q=>{const d=q.replace(/[$.\s]/g,''); return /^\d{3,}$/.test(d)?d:null;};
+function buscar(q){
+  const t=nrm(q.trim()); if(t.length<2) return null; const md=montoQ(q);
+  const hitM=m=>{const txt=nrm([m.id,m.quien,m.detalle,m.ndoc,m.cuenta,m.obra_n,m.doc,NATL(m.nat)].join(' ')); return txt.includes(t)||(md&&(String(Math.round(m.total)).includes(md)||String(Math.round(m.neto)).includes(md)));};
+  const O=obrasAll.filter(o=>nrm(o.nombre+' '+(o.cliente||'')+' '+o.id).includes(t)||(md&&(String(o.pres_total).includes(md)||String(o.pres_neto).includes(md))));
+  const M=D.movs.filter(hitM);
+  const C=COT.filter(c=>nrm((c.nombre||'')+' '+(c.cliente||'')).includes(t));
+  return {O,M,C};
+}
+function buscarDlg(q){
+  const r=buscar(q); if(!r) return;
+  const n=r.O.length+r.M.length+r.C.length;
+  $('#dlgT').innerHTML=`<h2 style="margin:0">Buscar</h2><input id="gq2" value="${esc(q)}" style="margin-top:8px" placeholder="Nombre, proveedor, N° de factura, monto…">`;
+  const body=()=>{const r=buscar($('#gq2').value)||{O:[],M:[],C:[]}; const n=r.O.length+r.M.length+r.C.length;
+   return `<small class="sub">${n} resultado${n===1?'':'s'}</small>
+   ${r.O.length?`<div><h3>Obras</h3><div class="tbl"><table><tbody>${r.O.slice(0,20).map(o=>`<tr class="click" data-obra="${o.id}"><td><b>${esc(o.nombre)}</b><br><small class="sub">${esc(o.cliente||'')} · ${o.id}</small></td><td>${o.abierta?'<span class="chip open">En curso</span>':'<span class="chip">Cerrada</span>'}</td><td class="n">${clp(o.pres_total)}<br><small class="sub">presupuesto con IVA</small></td></tr>`).join('')}</tbody></table></div></div>`:''}
+   ${r.M.length?`<div><h3>Movimientos${r.M.length>60?' (60 más recientes de '+r.M.length+')':''}</h3><div class="tbl"><table><tbody>${r.M.slice(0,60).map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td><b>${esc(m.quien)}</b><br><small class="sub">${esc(m.obra_n)} · ${esc(m.cuenta)}${m.ndoc?' · N° '+esc(m.ndoc):''}${m.detalle?' · '+esc(m.detalle.slice(0,50)):''}</small></td><td>${m.pagado?'':'<span class="chip warn">Pendiente</span>'}</td><td class="n ${m.tipo==='ingreso'?'pos':''}">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</td></tr>`).join('')}</tbody></table></div></div>`:''}
+   ${r.C.length?`<div><h3>Cotizaciones</h3><div class="tbl"><table><tbody>${r.C.map(c=>`<tr><td>${esc(c.nombre)}<br><small class="sub">${esc(c.cliente||'')}</small></td><td>${c.estado}</td><td class="n">${clp(c.neto+c.iva)}</td></tr>`).join('')}</tbody></table></div></div>`:''}
+   ${!n?'<p class="sub">Nada encontrado. Prueba con parte del nombre, el N° de factura o el monto sin puntos.</p>':''}`;};
+  $('#dlgB').innerHTML=body();
+  if(!$('#dlg').open) $('#dlg').showModal();
+  const i=$('#gq2'); i.focus(); i.setSelectionRange(i.value.length,i.value.length);
+  let tm; i.addEventListener('input',()=>{clearTimeout(tm); tm=setTimeout(()=>{$('#dlgB').innerHTML=body();},180);});
+}
+
 /* ---------- navegación ---------- */
 let cur='inicio';
 const TAB_DE=v=>SUB[v]?'mas':v;
@@ -839,6 +867,7 @@ function show(v){cur=v;document.querySelectorAll('#tabs button').forEach(b=>b.se
       guardar(c,t);});}
   if(v==='cotizar'){qRender(); $('#qf').addEventListener('input',e=>{const el=e.target; if(el.dataset.q){Q[el.dataset.q]=el.value; if(el.dataset.q==='un'){show('cotizar');return;}} if(el.dataset.qp) Q.p[el.dataset.qp]=el.value; qRender();});}
   if(v==='proveedores') $('#fprov').addEventListener('input',e=>{fprov=e.target.value; const q=fprov.toLowerCase(); document.querySelectorAll('#provT tr').forEach(tr=>tr.hidden=q&&!tr.dataset.name.includes(q));});
+  if(v==='obras'){const f=$('#fob'); f.addEventListener('input',()=>{fob=f.value; const pos=f.selectionStart; show('obras'); const g=$('#fob'); g.focus(); g.setSelectionRange(pos,pos);});}
   if(v==='reporte') $('#repM').addEventListener('change',e=>{repM=e.target.value; show('reporte');});
 }
 $('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b){if(b.dataset.v==='nuevo'&&!EDIT&&!F.liga){} show(b.dataset.v);}});
@@ -894,5 +923,8 @@ $('#loginF').addEventListener('submit',async e=>{e.preventDefault(); $('#lErr').
 $('#quien').addEventListener('click',()=>{abrir('Cambiar contraseña',`<label>Nueva contraseña (mínimo 10 caracteres)<input id="np1" type="password" autocomplete="new-password"></label><label>Repítela<input id="np2" type="password" autocomplete="new-password"></label><div class="row"><button class="btn" type="button" id="npGo">Guardar</button></div>`);
   $('#npGo').addEventListener('click',async()=>{const a=$('#np1').value,b=$('#np2').value; if(a.length<10){toast('Mínimo 10 caracteres');return;} if(a!==b){toast('No coinciden');return;}
     try{await api.cambiarClave(a); $('#dlg').close(); toast('Contraseña cambiada');}catch(e){toast('No se pudo: '+(e.message||e));}});});
+$('#gq').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.value.trim().length>=2){clearTimeout(window._gqt); buscarDlg(e.target.value); e.target.value='';}});
+$('#gq').addEventListener('input',e=>{const v=e.target.value; if(v.trim().length>=3){clearTimeout(window._gqt); window._gqt=setTimeout(()=>{buscarDlg(v); e.target.value='';},500);}});
+document.addEventListener('keydown',e=>{if(e.key==='/'&&!/input|textarea|select/i.test(document.activeElement.tagName)&&!$('#dlg').open){e.preventDefault(); $('#gq').focus();}});
 $('#salirBtn').addEventListener('click',async()=>{await api.salir(); location.reload();});
 iniciar();

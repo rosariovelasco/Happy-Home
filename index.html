@@ -128,6 +128,8 @@ tr[data-mov]{cursor:pointer} tr[data-mov]:hover td{background:var(--surface-2)}
 .dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0;font-size:14px}.dl dt{color:var(--muted)}.dl dd{margin:0}
 @media print{header.top,.banner,.noprint{display:none!important} main{padding:0} section.card{break-inside:avoid;border:0}}
 @media (max-width:640px){
+  #gq{width:100%!important;order:-1}
+  .who{flex-wrap:wrap}
   header.top nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));justify-content:space-around;flex-wrap:nowrap;overflow-x:auto}
   nav.tabs button{padding:8px 8px;font-size:12.5px}
   .who{margin-left:0;width:100%;display:flex;justify-content:space-between;gap:8px;font-size:12.5px}
@@ -168,12 +170,12 @@ tr[data-mov]{cursor:pointer} tr[data-mov]:hover td{background:var(--surface-2)}
     <button data-v="mas">Más</button>
     <button data-v="nuevo" class="solo-ros">+ Registrar</button>
   </nav>
-  <div class="who"><button class="salir" id="quien" type="button" title="Cambiar contraseña"></button> <button class="x" id="glosBtn" type="button">¿Qué significa?</button> <button class="salir" id="salirBtn" type="button">Salir</button></div>
+  <div class="who"><input id="gq" type="search" placeholder="Buscar… ( / )" aria-label="Buscar en toda la app" style="width:200px;padding:6px 10px"> <button class="salir" id="quien" type="button" title="Cambiar contraseña"></button> <button class="x" id="glosBtn" type="button">¿Qué significa?</button> <button class="salir" id="salirBtn" type="button">Salir</button></div>
 </div></header>
 <div class="banner" id="banner" hidden><p></p></div>
 <main id="app"><div class="loading">Cargando…</div></main>
 </div>
 <dialog id="dlg"><div class="dlg-h"><div id="dlgT"></div><button class="x" type="button" id="dlgX">Cerrar</button></div><div class="dlg-b" id="dlgB"></div></dialog>
-<script type="module" src="js/app.js?v=202610011502"></script>
+<script type="module" src="js/app.js?v=202610011505"></script>
 </body>
 </html>
