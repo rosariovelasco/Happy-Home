@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610021920';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021920';
+import * as api from './api.js?v=202610021933';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021933';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -115,7 +115,14 @@ function salud(){
   const nm=meses.filter(mm=>mm<HOY.slice(0,7)).length||1;
   const porMes=Math.max(0,Math.round(generado/nm));
   const hoyo=Math.max(0,retirado-generado);
-  return {generado,retirado,deRos,nm,porMes,hoyo,meses:porMes?Math.ceil(hoyo/porMes):null};
+  // lo que viene (base caja, igual que "generado"): proyectos en curso una vez + aseos al mes − gastos generales y cuotas
+  const abiertos=obras.filter(o=>o.abierta&&o.pres_neto>0);
+  const unaVez=Math.round(sum(abiertos.map(o=>{const r=repartoObra(o); const pc=o.pres_neto?o.cobrado_neto/o.pres_neto:0; return (r.faltaCobrar-r.faltaGastar)-(o.un==='Construcción'?o.cc_parte*(1-pc):0);}))
+    +sum(D.movs.filter(m=>!m.anulado&&!m.pagado&&m.nat==='Recupero').map(m=>+m.neto||0))-sum(D.movs.filter(m=>!m.anulado&&!m.pagado&&m.nat==='Costo directo'&&m.cuenta!=='Participación CC').map(m=>+m.neto||0)));
+  const aseoMes=Math.round(sum(abiertos.filter(o=>o.un==='Aseo').map(o=>o.pres_neto-(o.costo_est||o.costo_real))));
+  const FM=fijosMes(); const ggMes=C.estructura_prom, cuota=FM.cuota;
+  const deficit=aseoMes-ggMes-cuota;
+  return {generado,retirado,deRos,nm,porMes,hoyo,unaVez,aseoMes,ggMes,cuota,deficit,FM};
 }
 V.inicio=()=>{
   const alerts=[];
@@ -126,11 +133,11 @@ V.inicio=()=>{
   const SA=salud();
   const alarma=(SA.hoyo>0||libre<0)?`<section class="alarma"><div class="al-t">⚠ ${SA.hoyo>0?`Hay un hoyo de ${clp(SA.hoyo)}`:'No hay plata libre'}</div>
    <div class="al-g">
-    ${SA.hoyo>0?`<div><span>Desde abril HH ganó</span><b>${clp(SA.generado)}</b><small>margen HH − gastos generales</small></div><div><span>Retiros de Max</span><b class="negc">${clp(SA.retirado)}</b><small>${clp(Math.round(SA.retirado/SA.nm))} al mes${SA.deRos?' · incluye '+clp(SA.deRos)+' de Rosario':''}</small></div><div><span>Diferencia (plata de proyectos y de CC)</span><b class="negc">−${clp(SA.hoyo)}</b><small>se sacó más de lo que se ganó</small></div>`:''}
-    <div><span>Plata libre hoy</span><b class="${libre<0?'negc':'pos'}">${clp(libre)}</b><small>después de apartar todo lo comprometido</small></div>
-    <div><span>Se le debe a Casa Construcción</span><b>${clp(ccPend)}</b><small>participación, con IVA</small></div>
+    ${SA.hoyo>0?`<div><span>Desde abril HH ganó</span><b>${clp(SA.generado)}</b><small>margen HH − gastos generales (sin IVA)</small></div><div><span>Retiros de Max</span><b class="negc">${clp(SA.retirado)}</b><small>${clp(Math.round(SA.retirado/SA.nm))} al mes${SA.deRos?' · incluye '+clp(SA.deRos)+' de Rosario':''}</small></div><div><span>Se sacó de más</span><b class="negc">−${clp(SA.hoyo)}</b><small>salió de la plata que se le debe a CC</small></div>`:''}
+    <div><span>Lo que viene, por mes</span><b class="${SA.deficit<0?'negc':'pos'}">${SA.deficit<0?'−':'+'}${clp(Math.abs(SA.deficit))}</b><small>aseos ${clp(SA.aseoMes)} − gastos generales ${clp(SA.ggMes)} − cuota crédito ${clp(SA.cuota)}</small></div>
+    <div><span>Proyectos en curso, hasta terminar</span><b class="${SA.unaVez<0?'negc':''}">${SA.unaVez<0?'−':'+'}${clp(Math.abs(SA.unaVez))}</b><small>para HH, una sola vez${SA.unaVez<0?': su margen ya entró y se usó':''}</small></div>
    </div>
-   <p>${SA.hoyo>0?`<b>No hacer retiros hasta cerrar el hoyo.</b> HH genera ~${clp(SA.porMes)} al mes después de gastos generales: sin retiros, se cierra en ~${SA.meses} meses. `:''}Los gastos generales y las facturas de proveedores sí se pagan; los retiros esperan. <a href="#" data-go="reparto">Ver reparto →</a></p></section>`:'';
+   <p>${SA.deficit<0?`<b>Sin proyectos nuevos, el hoyo crece ~${clp(-SA.deficit)} al mes.</b> Para no seguir cayendo hay que vender ~${clp(-SA.deficit)} de margen HH al mes. `:''}${SA.hoyo>0?'<b>No hacer retiros</b> hasta cerrar el hoyo. ':''}Primero se pagan las facturas de costos de las obras y las obligaciones (Previred, crédito, impuestos); la participación de CC, a medida que paguen los clientes. <a href="#" data-go="reparto">Ver reparto →</a></p></section>`:'';
   return `<div><h1>Cómo va Happy Home</h1><p class="sub">Desde abril 2026 (datos cuadrados con el banco).</p></div>${alarma}
   <details class="card noprint" style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 18px"><summary style="cursor:pointer;font-weight:600">Qué hay en cada parte</summary><div class="grid g2" style="gap:6px 18px">
    <p class="sub" style="margin:0"><b>Obras:</b> margen de cada proyecto. Toca una para ver su ficha, sus movimientos y cerrarlo.</p>
@@ -142,17 +149,17 @@ V.inicio=()=>{
    <p class="sub" style="margin:0"><b>+ Registrar:</b> anotar un pago o cobro; muestra cómo afecta antes de guardar.</p>
   </div></details>
   <section class="card"><div class="grid g4 kini">
-    ${(()=>{const C_=obras.filter(o=>!o.abierta), A_=obras.filter(o=>o.abierta); const sm=(L,k)=>sum(L.map(o=>o[k]||0));
-      const genHH=tot.mc-sum(obras.map(ccPendiente))-(tot.e+tot.f);
-      return `<button type="button" class="kpi kbtn" data-fobr-go="cerrada"><span>Margen HH · proyectos cerrados desde abril</span><b>${clp(sm(C_,'margen'))}</b><small>sin IVA · ${C_.length} proyectos · <strong>antes de CC</strong>. De eso, CC se lleva ${clp(sm(C_,'cc_parte'))} y a HH le quedan ${clp(sm(C_,'margen_hh'))}</small><small class="ver">Ver proyectos →</small></button>
-    <button type="button" class="kpi kbtn" data-fobr-go="abierta"><span>Margen HH proyectado · en curso</span><b>${clp(sm(A_,'margen'))}</b><small>sin IVA · ${A_.length} proyectos · <strong>antes de CC</strong>. De eso, CC se lleva ${clp(sm(A_,'cc_parte'))} y a HH le quedan ${clp(sm(A_,'margen_hh'))}</small><small class="ver">Ver proyectos →</small></button>
-    <button type="button" class="kpi kbtn" data-go="reparto"><span>Utilidad HH desde abril</span><b class="${genHH>=0&&!SA.hoyo?'pos':'negc'}">${clp(genHH)}</b><small>sin IVA · margen HH − gastos generales${SA.hoyo?` · <strong class="negc">ya retirado ${clp(SA.retirado)}: faltan ${clp(SA.hoyo)}</strong>`:''}</small><small class="ver">Ver reparto →</small></button>`;})()}
+    ${(()=>{const genHH=tot.mc-sum(obras.map(ccPendiente))-(tot.e+tot.f);
+      return `<button type="button" class="kpi kbtn" data-go="reparto"><span>Utilidad HH desde abril</span><b class="${genHH>=0&&!SA.hoyo?'pos':'negc'}">${clp(genHH)}</b><small>sin IVA · margen HH − gastos generales${SA.hoyo?`<br><strong class="negc">Se retiró ${clp(SA.retirado)}: ${clp(SA.hoyo)} más de lo ganado.</strong> Esa diferencia es plata que se le debe a CC.`:''}</small><small class="ver">Ver reparto →</small></button>`;})()}
     <button type="button" class="kpi kbtn" data-k="libre"><span>Plata libre hoy</span><b class="${libre>=0?'pos':'negc'}">${clp(libre)}</b><small>banco ${clp(cajaTotal)} − comprometido ${clp(cajaTotal-libre)}</small><small class="ver">Ver de dónde sale →</small></button>
+    <button type="button" class="kpi kbtn" data-go="reparto"><span>Se le debe a Casa Construcción</span><b>${clp(ccPend)}</b><small>participación, con IVA · ${obras.filter(o=>ccPendiente(o)>0).map(o=>esc(o.nombre.split(' (')[0])+' '+clp(ccPlata(o))).join(' · ')}</small><small class="ver">Ver reparto →</small></button>
+    <button type="button" class="kpi kbtn" data-go="fijos"><span>Falta pagar este mes</span><b>${clp(pagosPend+SA.FM.falta)}</b><small>con IVA · proveedores ${clp(pagosPend)} + gastos fijos ${clp(SA.FM.falta)}</small><small class="ver">Ver gastos fijos →</small></button>
     <button type="button" class="kpi kbtn" data-k="cobrar"><span>Por cobrar a clientes</span><b>${clp(porCobrar)}</b><small>con IVA · lo que todavía deben pagar</small><small class="ver">Ver detalle →</small></button>
   </div></section>
   <div class="grid g2">
-    <section class="card"><h2>Proyectos en curso</h2><div class="tbl"><table><thead><tr><th>Proyecto</th><th class="n">Margen proyectado</th><th>Gasto vs. estimado</th></tr></thead><tbody>
-    ${open.map(o=>`<tr class="click" data-obra="${o.id}"><td>${esc(o.nombre)}<br><span class="chip ${o.un}">${o.un}</span></td><td class="n">${clp(o.margen)}<br><small class="${o.margen_pct>=20?'pos':'negc'}">${pct(o.margen_pct)}</small></td><td style="min-width:120px">${o.avance_gasto!=null?`<div class="bar"><i class="${o.avance_gasto>100?'bad':o.avance_gasto>85?'warn':''}" style="width:${Math.min(100,o.avance_gasto)}%"></i></div><small class="num">${pct(o.avance_gasto)}</small>`:'<small>sin costo estimado</small>'}</td></tr>`).join('')}
+    <section class="card"><h2>Proyectos en curso</h2><div class="tbl"><table><thead><tr><th>Proyecto</th><th class="n">Queda para terminar</th><th class="n">Falta que pague el cliente</th></tr></thead><tbody>
+    ${open.map(o=>{const q=o.costo_est?Math.round((o.costo_est-o.costo_real)*1.19):null; return `<tr class="click" data-obra="${o.id}"><td>${esc(o.nombre)}<br><span class="chip ${o.un}">${o.un}</span></td><td class="n ${q!=null&&q<0?'negc':''}">${q==null?'—':clp(q)}</td><td class="n">${clp(o.por_cobrar)}</td></tr>`;}).join('')}
+    <tr><td colspan="3"><small class="sub">Con IVA. "Queda para terminar" = costo estimado − costo anotado: lo que se puede seguir gastando sin comerse la ganancia.</small></td></tr>
     </tbody></table></div></section>
     <section class="card"><h2>Requiere atención</h2><ul class="alerts">${alerts.join('')||'<li>Nada pendiente.</li>'}</ul></section>
   </div>`;
@@ -166,6 +173,11 @@ V.obras=()=>{
     return `<tr class="click" data-obra="${o.id}"><td><b>${esc(o.nombre)}</b><br><small>${esc(o.cliente||'')}</small></td><td><span class="chip ${o.un}">${o.un}</span></td><td>${st}</td>
     <td class="n">${clp(o.pres_neto)}</td><td class="n">${clp(o.abierta?o.costo_final:o.costo_real)}</td><td class="n ${o.margen>=0?'':'negc'}">${clp(o.margen)}</td><td class="n">${o.pres_neto||o.cobrado_neto?pct(o.margen_pct):'—'}</td><td class="n">${o.un==='Construcción'?clp(o.margen-o.cc_parte):clp(o.margen)}</td><td class="n">${o.abierta&&o.costo_est?`<span class="${o.costo_est-o.costo_real<0?'negc':''}">${clp(Math.round((o.costo_est-o.costo_real)*1.19))}</span>`:'—'}</td></tr>`}).join('');
   return `<div><h1>Proyectos</h1><p class="sub">Margen = ventas netas − costos directos (materiales, subcontratos, fletes…). En construcción, la mitad del margen es la participación de Casa Construcción, que es costo para Happy Home. En proyectos en curso se usa el costo estimado mientras el gasto real no lo supere. Toca un proyecto para ver su ficha.</p></div>
+  ${(()=>{const C_=obras.filter(o=>!o.abierta), A_=obras.filter(o=>o.abierta); const sm=(L,k)=>sum(L.map(o=>o[k]||0));
+    return `<section class="card"><div class="grid g2 kini">
+    <button type="button" class="kpi kbtn" data-fobr="cerrada"><span>Margen HH · proyectos cerrados desde abril</span><b>${clp(sm(C_,'margen'))}</b><small>sin IVA · ${C_.length} proyectos · <strong>antes de CC</strong>. De eso, CC se lleva ${clp(sm(C_,'cc_parte'))} y a HH le quedan ${clp(sm(C_,'margen_hh'))}</small></button>
+    <button type="button" class="kpi kbtn" data-fobr="abierta"><span>Margen HH proyectado · en curso</span><b>${clp(sm(A_,'margen'))}</b><small>sin IVA · ${A_.length} proyectos · <strong>antes de CC</strong>. De eso, CC se lleva ${clp(sm(A_,'cc_parte'))} y a HH le quedan ${clp(sm(A_,'margen_hh'))}</small></button>
+    </div></section>`;})()}
   <section class="card"><label style="margin-bottom:10px">Buscar proyecto<input id="fob" value="${esc(fob)}" placeholder="Nombre, cliente o código (busca también en proyectos antiguos)"></label><div class="spread" style="margin-bottom:10px"><div class="seg">${[['','Todos'],['abierta','En curso'],['cerrada','Cerrados'],['cuadrar','Por cuadrar']].map(([k,t])=>`<button type="button" data-fobr="${k}" aria-pressed="${fobr===k}">${t} <small>${obras.filter(o=>!k||(k==='abierta'?o.abierta:k==='cerrada'?(!o.abierta&&!noCuadrada(o)):(!o.abierta&&noCuadrada(o)))).length}</small></button>`).join('')}</div><div class="row solo-ros"><button class="btn" type="button" data-act="obra-new">+ Nuevo proyecto</button><button class="btn ghost" type="button" data-go="cotizar">Desde cotización</button></div></div><div class="tbl"><table><thead><tr><th>Proyecto</th><th>Unidad</th><th>Estado</th><th class="n">Presupuesto neto</th><th class="n">Costo directo</th><th class="n">Margen proyecto</th><th class="n">%</th><th class="n">Queda para HH</th><th class="n">Queda para gastar <small>(con IVA)</small></th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 };
 function ficha(id){
@@ -341,6 +353,19 @@ function fijoDe(m){
   return FIJOS.find(f=>(m.nat!=='Costo directo'||f.tambienObra)&&(!f.soloNat||f.soloNat.includes(m.nat))&&(!f.noafecta||m.nat==='No afecta')&&(f.noafecta||m.nat!=='No afecta')&&f.k.some(k=>new RegExp('(^|[^a-z])'+nrm(k)+'([^a-z]|$)').test(t)))||null;
 }
 const esFijo=m=>!!fijoDe(m);
+function fijosMes(){
+  const ms=meses, mesAct=HOY.slice(0,7);
+  const tab=FIJOS.map(f=>{const por={}; ms.forEach(mm=>por[mm]=0);
+    D.movs.filter(m=>m.pagado&&m.fecha&&fijoDe(m)===f).forEach(m=>{const mm=m.fecha.slice(0,7); if(mm in por) por[mm]+=m.total;});
+    const vals=ms.filter(mm=>mm<mesAct).map(mm=>por[mm]).filter(v=>v>0).sort((a,b)=>a-b);
+    const tipico=vals.length?vals[Math.floor(vals.length/2)]:0;
+    const ult3=ms.filter(mm=>mm<mesAct).slice(-3);
+    const terminado=tipico>0&&ult3.length===3&&ult3.every(mm=>!(por[mm]>0))&&!(por[mesAct]>0);
+    return {f,por,tipico,terminado};});
+  const activos=tab.filter(r=>r.tipico>0&&!r.terminado&&!r.f.impuesto);
+  const faltan=activos.filter(r=>!(r.por[mesAct]>0));
+  return {faltan,falta:sum(faltan.map(r=>r.tipico)),cuota:sum(activos.filter(r=>r.f.cuenta==='Cuota de crédito').map(r=>r.tipico))};
+}
 V.fijos=()=>{
   const ms=meses; const mesAct=HOY.slice(0,7);
   const tab=FIJOS.map(f=>{const por={}; ms.forEach(mm=>por[mm]=0);
