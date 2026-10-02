@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610021852';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021852';
+import * as api from './api.js?v=202610021912';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021912';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -100,13 +100,29 @@ function desgloseCobrar(){
 function abrir(t,html){$('#dlgT').innerHTML=`<h2 style="margin:0">${t}</h2>`;$('#dlgB').innerHTML=html;$('#dlg').showModal();}
 /* ---------- vistas ---------- */
 const V={};
+function salud(){
+  const generado=tot.mc-sum(obras.map(ccPendiente))-(tot.e+tot.f);
+  const retirado=sum(D.movs.filter(m=>m.cuenta==='Retiro de socio'&&m.pagado&&(m.fecha||'')>='2026-04-01').map(m=>m.total));
+  const nm=meses.filter(mm=>mm<HOY.slice(0,7)).length||1;
+  const porMes=Math.max(0,Math.round(generado/nm));
+  const hoyo=Math.max(0,retirado-generado);
+  return {generado,retirado,nm,porMes,hoyo,meses:porMes?Math.ceil(hoyo/porMes):null};
+}
 V.inicio=()=>{
   const alerts=[];
   obras.filter(noCuadrada).forEach(o=>alerts.push(`<li><span class="chip bad">Por cuadrar</span><span><b>${esc(o.nombre)}</b>: la diferencia entre presupuesto y lo pagado por el cliente es de ${clp(o.descuadre)} neto. No se puede cerrar hasta cobrarlo o declararlo como no pagado.</span></li>`));
   obras.filter(o=>ccPendiente(o)>0).forEach(o=>alerts.push(`<li><span class="chip warn">Casa Construcción</span><span><b>${esc(o.nombre)}</b>: le faltan por transferir ${clp(ccPlata(o))} (con IVA) de participación${o.abierta?' sobre lo que ya pagó el cliente (estimado)':''}.</span></li>`));
   C.pend_pagos.forEach(p=>alerts.push(`<li><span class="chip warn">Por pagar</span><span><b>${esc(p.quien)}</b> ${clp(p.total)} · ${esc(p.obra)} · ${fdate(p.fecha)}</span></li>`));
   const open=obras.filter(o=>o.abierta);
-  return `<div><h1>Cómo va Happy Home</h1><p class="sub">Desde abril 2026 (datos cuadrados con el banco).</p></div>
+  const SA=salud();
+  const alarma=(SA.hoyo>0||libre<0)?`<section class="alarma"><div class="al-t">⚠ ${SA.hoyo>0?`Hay un hoyo de ${clp(SA.hoyo)}`:'No hay plata libre'}</div>
+   <div class="al-g">
+    ${SA.hoyo>0?`<div><span>Desde abril HH ganó</span><b>${clp(SA.generado)}</b><small>margen HH − gastos generales</small></div><div><span>Los socios retiraron</span><b class="negc">${clp(SA.retirado)}</b><small>${clp(Math.round(SA.retirado/SA.nm))} al mes en promedio</small></div><div><span>Diferencia (plata de proyectos y de CC)</span><b class="negc">−${clp(SA.hoyo)}</b><small>se sacó más de lo que se ganó</small></div>`:''}
+    <div><span>Plata libre hoy</span><b class="${libre<0?'negc':'pos'}">${clp(libre)}</b><small>después de apartar todo lo comprometido</small></div>
+    <div><span>Se le debe a Casa Construcción</span><b>${clp(ccPend)}</b><small>participación, con IVA</small></div>
+   </div>
+   <p>${SA.hoyo>0?`<b>No hacer retiros hasta cerrar el hoyo.</b> HH genera ~${clp(SA.porMes)} al mes después de gastos generales: sin retiros, se cierra en ~${SA.meses} meses. `:''}Los gastos generales y las facturas de proveedores sí se pagan; los retiros esperan. <a href="#" data-go="reparto">Ver reparto →</a></p></section>`:'';
+  return `<div><h1>Cómo va Happy Home</h1><p class="sub">Desde abril 2026 (datos cuadrados con el banco).</p></div>${alarma}
   <details class="card noprint" style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 18px"><summary style="cursor:pointer;font-weight:600">Qué hay en cada parte</summary><div class="grid g2" style="gap:6px 18px">
    <p class="sub" style="margin:0"><b>Obras:</b> margen de cada proyecto. Toca una para ver su ficha, sus movimientos y cerrarlo.</p>
    <p class="sub" style="margin:0"><b>Cotizar:</b> precio a partir de costos, comparado con proyectos reales. Al aprobar, crea el proyecto.</p>
@@ -121,7 +137,7 @@ V.inicio=()=>{
       const genHH=tot.mc-sum(obras.map(ccPendiente))-(tot.e+tot.f);
       return `<button type="button" class="kpi kbtn" data-fobr-go="cerrada"><span>Margen HH · proyectos cerrados desde abril</span><b>${clp(sm(C_,'margen'))}</b><small>sin IVA · ${C_.length} proyectos · <strong>antes de CC</strong>. De eso, CC se lleva ${clp(sm(C_,'cc_parte'))} y a HH le quedan ${clp(sm(C_,'margen_hh'))}</small><small class="ver">Ver proyectos →</small></button>
     <button type="button" class="kpi kbtn" data-fobr-go="abierta"><span>Margen HH proyectado · en curso</span><b>${clp(sm(A_,'margen'))}</b><small>sin IVA · ${A_.length} proyectos · <strong>antes de CC</strong>. De eso, CC se lleva ${clp(sm(A_,'cc_parte'))} y a HH le quedan ${clp(sm(A_,'margen_hh'))}</small><small class="ver">Ver proyectos →</small></button>
-    <button type="button" class="kpi kbtn" data-go="reparto"><span>Utilidad HH desde abril</span><b class="${genHH>=0?'pos':'negc'}">${clp(genHH)}</b><small>sin IVA · margen HH − gastos generales</small><small class="ver">Ver reparto →</small></button>`;})()}
+    <button type="button" class="kpi kbtn" data-go="reparto"><span>Utilidad HH desde abril</span><b class="${genHH>=0&&!SA.hoyo?'pos':'negc'}">${clp(genHH)}</b><small>sin IVA · margen HH − gastos generales${SA.hoyo?` · <strong class="negc">ya retirado ${clp(SA.retirado)}: faltan ${clp(SA.hoyo)}</strong>`:''}</small><small class="ver">Ver reparto →</small></button>`;})()}
     <button type="button" class="kpi kbtn" data-k="libre"><span>Plata libre hoy</span><b class="${libre>=0?'pos':'negc'}">${clp(libre)}</b><small>banco ${clp(cajaTotal)} − comprometido ${clp(cajaTotal-libre)}</small><small class="ver">Ver de dónde sale →</small></button>
     <button type="button" class="kpi kbtn" data-k="cobrar"><span>Por cobrar a clientes</span><b>${clp(porCobrar)}</b><small>con IVA · lo que todavía deben pagar</small><small class="ver">Ver detalle →</small></button>
   </div></section>
