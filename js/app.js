@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610021704';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021704';
+import * as api from './api.js?v=202610021717';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021717';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -112,14 +112,14 @@ V.inicio=()=>{
    <p class="sub" style="margin:0"><b>Más:</b> reporte para Max, conciliación con el banco, IVA, socios y CC, proveedores y clientes.</p>
    <p class="sub" style="margin:0"><b>+ Registrar:</b> anotar un pago o cobro; muestra cómo afecta antes de guardar.</p>
   </div></details>
-  <section class="card"><div class="grid g4">
+  <section class="card"><div class="grid g4 kini">
     ${(()=>{const C_=obras.filter(o=>!o.abierta), A_=obras.filter(o=>o.abierta); const sm=(L,k)=>sum(L.map(o=>o[k]||0));
       const genHH=tot.mc-sum(obras.map(ccPendiente))-(tot.e+tot.f);
-      return `<button type="button" class="kpi kbtn" data-fobr-go="cerrada"><span>Proyectos cerrados (desde abril)</span><b>${clp(sm(C_,'margen'))}</b><small>margen real sin IVA de ${C_.length} proyectos · para HH ${clp(sm(C_,'margen_hh'))} después de CC</small><small class="ver">Ver proyectos →</small></button>
-    <button type="button" class="kpi kbtn" data-fobr-go="abierta"><span>Proyectos en curso</span><b>${clp(sm(A_,'margen'))}</b><small>margen proyectado sin IVA de ${A_.length} proyectos · para HH ${clp(sm(A_,'margen_hh'))}</small><small class="ver">Ver proyectos →</small></button>
-    <button type="button" class="kpi kbtn" data-go="reparto"><span>Ganado por HH desde abril</span><b class="${genHH>=0?'pos':'negc'}">${clp(genHH)}</b><small>lo que dejaron los proyectos, menos lo de CC y los gastos generales</small><small class="ver">Ver reparto →</small></button>`;})()}
+      return `<button type="button" class="kpi kbtn" data-fobr-go="cerrada"><span>Margen proyectos cerrados (desde abril)</span><b>${clp(sm(C_,'margen'))}</b><small>${C_.length} proyectos · sin IVA · margen HH ${clp(sm(C_,'margen_hh'))} después de CC</small><small class="ver">Ver proyectos →</small></button>
+    <button type="button" class="kpi kbtn" data-fobr-go="abierta"><span>Margen proyectado en curso</span><b>${clp(sm(A_,'margen'))}</b><small>${A_.length} proyectos · sin IVA · margen HH ${clp(sm(A_,'margen_hh'))} después de CC</small><small class="ver">Ver proyectos →</small></button>
+    <button type="button" class="kpi kbtn" data-go="reparto"><span>Utilidad HH desde abril</span><b class="${genHH>=0?'pos':'negc'}">${clp(genHH)}</b><small>sin IVA · margen HH − gastos generales</small><small class="ver">Ver reparto →</small></button>`;})()}
     <button type="button" class="kpi kbtn" data-k="libre"><span>Plata libre hoy</span><b class="${libre>=0?'pos':'negc'}">${clp(libre)}</b><small>banco ${clp(cajaTotal)} − comprometido ${clp(cajaTotal-libre)}</small><small class="ver">Ver de dónde sale →</small></button>
-    <button type="button" class="kpi kbtn" data-k="cobrar"><span>Por cobrar</span><b>${clp(porCobrar)}</b><small>lo que los clientes todavía deben pagar (con IVA)</small><small class="ver">Ver detalle →</small></button>
+    <button type="button" class="kpi kbtn" data-k="cobrar"><span>Por cobrar a clientes</span><b>${clp(porCobrar)}</b><small>con IVA · lo que todavía deben pagar</small><small class="ver">Ver detalle →</small></button>
   </div></section>
   <div class="grid g2">
     <section class="card"><h2>Proyectos en curso</h2><div class="tbl"><table><thead><tr><th>Proyecto</th><th class="n">Margen proyectado</th><th>Gasto vs. estimado</th></tr></thead><tbody>
@@ -151,7 +151,7 @@ function ficha(id){
    <div class="kpi"><span>Presupuesto neto</span><b>${clp(o.pres_neto)}</b><small>${clp(o.pres_total)} con IVA</small></div>
    <div class="kpi"><span>${o.abierta?'Gastado a la fecha':'Costo directo'}</span><b>${clp(o.costo_real)}</b><small>${o.abierta&&o.costo_est?'de un costo estimado de '+clp(o.costo_est)+' · ':''}sin IVA · con IVA ${clp(o.costo_con_iva)} · sin Casa Construcción, menos reembolsos</small></div>
    <div class="kpi"><span>Margen ${o.abierta?'proyectado':'real'}</span><b class="${o.margen>=0?'pos':'negc'}">${clp(o.margen)}</b><small>${pct(o.margen_pct)}${o.abierta?' · presupuesto − '+(o.costo_final>o.costo_real?'costo estimado':'gastado'):''}</small></div>
-   ${cc?`<div class="kpi"><span>Queda para Happy Home</span><b>${clp(o.margen-o.cc_parte)}</b><small>después de Casa Construcción</small></div>`:`<div class="kpi"><span>Pagado por el cliente</span><b>${clp(o.cobrado_total)}</b><small>con IVA</small></div>`}
+   ${cc?`<div class="kpi"><span>Margen HH</span><b>${clp(o.margen-o.cc_parte)}</b><small>margen del proyecto − parte de Casa Construcción</small></div>`:`<div class="kpi"><span>Pagado por el cliente</span><b>${clp(o.cobrado_total)}</b><small>con IVA</small></div>`}
   </div>
   ${noCuadrada(o)?`<p class="note bad"><b>No cuadra:</b> faltan ${clp(o.descuadre)} netos entre el presupuesto y lo pagado por el cliente. Para cerrarlo hay que registrar el pago que falta o declararlo como "monto no pagado por el cliente".</p>`:''}
   <div><h3>Cobro al cliente</h3><div class="bar"><i style="width:${cob}%"></i></div><div class="spread"><small class="num">${clp(o.cobrado_total)} pagado por el cliente</small><small class="num">${o.abierta?clp(o.por_cobrar)+' por cobrar':''}</small></div></div>
@@ -182,7 +182,7 @@ function ficha(id){
     <tr><td>Ya transferido</td><td class="n">${clp(o.cc_pagado)}</td><td class="n">${clp(o.cc_pagado_total)}</td></tr>
     <tr class="tot"><td>Falta transferir${o.abierta?' (estimado)':''}</td><td class="n">${clp(ccPendiente(o))}</td><td class="n">${clp(ccPlata(o))}</td></tr></tbody></table></div><p class="help">CC factura su participación: de lo que le transfieres, el IVA lo recupera HH en el F29.</p>`;})():''}
   <div><h3>Movimientos de este proyecto</h3><div class="tbl"><table><thead><tr><th>Fecha</th><th>Quién</th><th>Qué es</th><th class="n">Monto</th></tr></thead><tbody>
-   ${D.movs.filter(m=>m.obra_n===o.nombre).map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td>${esc(m.quien)}${m.detalle?`<br><small class="sub">${esc(m.detalle.slice(0,50))}</small>`:''}</td><td><span class="chip ${m.nat==='Venta'?'open':''}">${esc(m.cuenta)}</span>${!m.pagado?' <span class="chip warn">Pendiente</span>':''}</td><td class="n ${m.tipo==='ingreso'?'pos':''}">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</td></tr>`).join('')||'<tr><td colspan="4">Sin movimientos desde abril.</td></tr>'}
+   ${D.movs.filter(m=>m.obra_n===o.nombre).map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td>${esc(m.quien)}${m.detalle?`<br><small class="sub">${esc(m.detalle.slice(0,50))}</small>`:''}</td><td><span class="chip ${m.nat==='Venta'?'open':''}">${esc(CTA(m.cuenta))}</span>${!m.pagado?' <span class="chip warn">Pendiente</span>':''}</td><td class="n ${m.tipo==='ingreso'?'pos':''}">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</td></tr>`).join('')||'<tr><td colspan="4">Sin movimientos desde abril.</td></tr>'}
   </tbody></table></div><p class="help">Verde y con + : plata que entró. Con − : plata que salió. Incluye todo el historial del proyecto.</p></div>
   ${o.cierre?`<div><h3>Cierre</h3><p class="sub" style="margin:0">${o.cierre.q?o.cierre.q+' '+esc(o.cierre.u)+' · '+clp(o.pres_neto/o.cierre.q)+' por '+esc(o.cierre.u)+' · ':''}${o.cierre.dias?o.cierre.dias+' días · ':''}${esc(o.cierre.apr||'')}</p></div>`:''}
   <div class="row solo-ros"><button class="btn ghost" type="button" data-act="obra-edit" data-id="${o.id}">Editar datos del proyecto</button>${o.un==='Aseo'?`<button class="btn ghost" type="button" data-act="mes-sig" data-id="${o.id}">Crear el mes siguiente</button>`:''}</div>
@@ -276,10 +276,10 @@ V.movs=()=>{
 function movTable(){
   const q=fq.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''), qd=fq.replace(/\D/g,'');
   let L=D.movs.filter(m=>m.pagado&&(!fnat||m.nat===fnat)&&(!fobra||m.obra_n===fobra)&&(!fest||(m.estado_doc||'no_aplica')===fest)
-    &&(!q||((m.quien||'')+' '+(m.detalle||'')+' '+(m.ndoc||'')+' '+m.cuenta).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').includes(q)||(qd&&String(m.total).includes(qd))));
+    &&(!q||((m.quien||'')+' '+(m.detalle||'')+' '+(m.ndoc||'')+' '+m.cuenta+' '+CTA(m.cuenta)).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').includes(q)||(qd&&String(m.total).includes(qd))));
   const n=L.length; L=L.slice(0,150);
   $('#movT').innerHTML=`<small class="sub">${n} movimientos${n>150?' · se muestran los 150 más recientes':''}</small><div class="tbl"><table><thead><tr><th>Fecha</th><th>Quién</th><th>Qué es</th><th>Proyecto</th><th>Doc.</th><th class="n">Neto</th><th class="n">IVA</th><th class="n">Total</th></tr></thead><tbody>
-  ${L.map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td>${esc(m.quien)}${m.detalle?`<br><small class="sub">${esc(m.detalle.slice(0,60))}</small>`:''}</td><td><span class="chip ${m.nat==='Venta'?'open':m.nat==='Pérdida'?'bad':''}">${esc(m.cuenta)}</span>${esFijo(m)?' <span class="chip">fijo</span>':''}${edocChip(m)}</td><td><small>${esc(m.obra_n)}</small></td><td><small>${esc(m.doc)}${m.ndoc?' '+esc(m.ndoc):''}</small></td><td class="n">${clp(m.neto)}</td><td class="n">${m.iva?clp(m.iva):'—'}</td><td class="n ${m.tipo==='ingreso'?'pos':''}"><b>${m.tipo==='ingreso'?'+':''}${clp(m.total)}</b></td></tr>`).join('')}</tbody></table></div>`;
+  ${L.map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td>${esc(m.quien)}${m.detalle?`<br><small class="sub">${esc(m.detalle.slice(0,60))}</small>`:''}</td><td><span class="chip ${m.nat==='Venta'?'open':m.nat==='Pérdida'?'bad':''}">${esc(CTA(m.cuenta))}</span>${esFijo(m)?' <span class="chip">fijo</span>':''}${edocChip(m)}</td><td><small>${esc(m.obra_n)}</small></td><td><small>${esc(m.doc)}${m.ndoc?' '+esc(m.ndoc):''}</small></td><td class="n">${clp(m.neto)}</td><td class="n">${m.iva?clp(m.iva):'—'}</td><td class="n ${m.tipo==='ingreso'?'pos':''}"><b>${m.tipo==='ingreso'?'+':''}${clp(m.total)}</b></td></tr>`).join('')}</tbody></table></div>`;
 }
 function rapido(id){
   const m=movById(id); if(!m) return;
@@ -374,7 +374,7 @@ function formHTML(){
   if(t.prov) h+=`<label>Proveedor<input id="f_prov" list="provs" value="${esc(F.prov)}" placeholder="Ej: Sodimac, Glendy Puyosa"><datalist id="provs">${provs.map(p=>`<option value="${esc(p)}">`).join('')}</datalist></label>`;
   if(t.k==='cobro'||t.k==='reemb'||t.k==='nopago') h+=`<label>Cliente<input id="f_prov" value="${esc(F.prov)}" placeholder="Se toma de la obra"></label>`;
   if(t.k==='retiro'||t.k==='socio'||t.k==='reembsocio') h+=`<label>Socio<select id="f_socio">${['Rosario','Max'].map(s=>`<option ${F.socio===s?'selected':''}>${s}</option>`).join('')}</select></label>`;
-  if(t.prov) h+=`<label>Cuenta<select id="f_cuenta">${['','Materiales','Subcontrato / mano de obra','Arriendo equipos y herramientas','Fletes y traslados','Retiro de escombros','Viáticos','Participación CC','Comisión de cobro','Remuneraciones y honorarios','Teléfono e internet','Vehículo y traslados','Marketing','Patentes y permisos','Otros gastos generales'].map(c=>`<option ${F.cuenta===c?'selected':''} value="${c}">${c||'(la sugiere el proveedor)'}</option>`).join('')}</select></label>`;
+  if(t.prov) h+=`<label>Cuenta<select id="f_cuenta">${['','Materiales','Subcontrato / mano de obra','Arriendo equipos y herramientas','Fletes y traslados','Retiro de escombros','Viáticos','Participación CC','Comisión de cobro','Remuneraciones y honorarios','Teléfono e internet','Vehículo y traslados','Marketing','Patentes y permisos','Otros gastos generales'].map(c=>`<option ${F.cuenta===c?'selected':''} value="${c}">${CTA(c)||'(la sugiere el proveedor)'}</option>`).join('')}</select></label>`;
   if(t.obra) h+=`<label>${t.k==='retiro'?'De qué proyecto <small>(opcional: para el reparto)</small>':'Proyecto'+(t.obra==='req'?'':' <small>(obligatoria si es costo de proyecto)</small>')}<select id="f_obra"><option value="">${t.obra==='req'?'Elige la obra':'General HH (sin proyecto)'}</option>${obrasSelF().map(o=>`<option value="${o.id}" ${F.obra===o.id?'selected':''}>${esc(o.nombre)}${o.abierta?'':' (cerrado)'}</option>`).join('')}</select></label>`;
   if(t.doc) h+=`<label>Documento<select id="f_doc">${['Factura','Boleta','Boleta de honorarios','Nada'].map(d=>`<option ${F.doc===d?'selected':''}>${d}</option>`).join('')}</select></label><label>N° documento<input id="f_ndoc" value="${esc(F.ndoc)}" inputmode="numeric"></label>`;
   if(t.doc) h+=`<label>Estado del documento<select id="f_edoc">${[['ok',t.k==='cobro'?'Factura enviada':'Recibido'],['falta',t.k==='cobro'?'Falta enviar factura':'Falta factura'],['por_emitir','Hacer boleta'],['no_aplica','No aplica']].map(([k,l])=>`<option value="${k}" ${(F.edoc||(F.doc==='Nada'?'no_aplica':'ok'))===k?'selected':''}>${l}</option>`).join('')}</select></label>`;
@@ -492,6 +492,7 @@ function toast(msg){document.querySelectorAll('.toast').forEach(x=>x.remove());c
    cotizador, proveedores, clientes, socios, impuestos,
    conciliación y reporte para Max
    ========================================================= */
+const CTA=c=>c==='Participación CC'?'Reparto CC':c;
 const isMax=()=>!ME||ME.rol!=='admin';
 const movById=id=>D.movs.find(m=>m.id===id);
 const obraDe=m=>obrasAll.find(o=>o.id===m.obra_id);
@@ -512,11 +513,11 @@ function movDlg(id){
   if(!m){const p=C.pend_pagos.find(x=>x.id===id); if(!p) return; m={id,fecha:p.fecha,tipo:'egreso',quien:p.quien,total:p.total,neto:p.total,iva:0,doc:'—',ndoc:'',pagado:false,detalle:p.detalle,nat:'—',cuenta:'—',obra_n:p.obra};}
   const bk=(D.banco||[]).find(b=>b.movs.includes(id));
   const o=obraDe(m);
-  $('#dlgT').innerHTML=`<h2 style="margin:0">${esc(m.quien||'—')} <span class="num" style="font-weight:500">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</span></h2><div class="row"><span class="chip">${esc(m.cuenta)}</span>${m.pagado?'<span class="chip open">'+'Pagado'+'</span>':'<span class="chip warn">Pendiente</span>'}<small class="sub" style="margin:0">${m.id}</small></div>`;
+  $('#dlgT').innerHTML=`<h2 style="margin:0">${esc(m.quien||'—')} <span class="num" style="font-weight:500">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</span></h2><div class="row"><span class="chip">${esc(CTA(m.cuenta))}</span>${m.pagado?'<span class="chip open">'+'Pagado'+'</span>':'<span class="chip warn">Pendiente</span>'}<small class="sub" style="margin:0">${m.id}</small></div>`;
   $('#dlgB').innerHTML=`<dl class="dl">
     <dt>Fecha</dt><dd>${m.fecha?fdate(m.fecha)+' '+m.fecha.slice(0,4):'<span class="negc">sin fecha</span>'}</dd>
     <dt>Proyecto</dt><dd>${o?`<a href="#" data-obra="${o.id}">${esc(m.obra_n)}</a>`:esc(m.obra_n)}</dd>
-    <dt>Naturaleza</dt><dd>${esc(m.nat)} · ${esc(m.cuenta)}</dd>
+    <dt>Naturaleza</dt><dd>${m.cuenta==='Participación CC'?'Reparto del margen con Casa Construcción (no es costo del proyecto)':esc(m.nat)+' · '+esc(CTA(m.cuenta))}</dd>
     <dt>Medio</dt><dd>${esc(m.medio||'—')}</dd>
     <dt>Documento</dt><dd>${esc(m.doc)}${m.ndoc?' N° '+esc(m.ndoc):''} · <b>${EDOC(m)}</b>${['falta','por_emitir'].includes(m.estado_doc)?` <button class="x solo-ros" type="button" data-act="doc-ok" data-id="${m.id}">Marcar ${m.tipo==='ingreso'?'enviada':'recibido'}</button>`:''}</dd>
     <dt>Neto / IVA</dt><dd class="num">${clp(m.neto)} / ${clp(m.iva)}</dd>
@@ -581,7 +582,7 @@ function cierre(id){
    <div class="kpi"><span>Venta neta</span><b>${clp(o.pres_neto)}</b></div>
    <div class="kpi"><span>Costo directo real</span><b>${clp(o.costo_real)}</b></div>
    <div class="kpi"><span>Margen real</span><b class="${margenReal>=0?'pos':'negc'}">${clp(margenReal)}</b><small>${pct(o.pres_neto?margenReal/o.pres_neto*100:0)} · proyectado era ${pct(o.margen_pct)}</small></div>
-   <div class="kpi"><span>Queda para HH</span><b>${clp(margenReal-ccReal)}</b></div>
+   <div class="kpi"><span>Margen HH</span><b>${clp(margenReal-ccReal)}</b></div>
   </div>
   <div class="form">
    <label>Cantidad (para el cotizador)<input id="ci_q" inputmode="decimal" placeholder="Ej: 85"></label>
@@ -783,7 +784,7 @@ V.proveedores=()=>{
 };
 function provDlg(k){
   const g=window._PROV[k]; const L=g.ids.map(movById).filter(Boolean);
-  abrir(esc(k),`<div class="tbl"><table><thead><tr><th>Fecha</th><th>Proyecto</th><th>Cuenta</th><th class="n">Total</th></tr></thead><tbody>${L.map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td><small>${esc(m.obra_n)}</small></td><td><small>${esc(m.cuenta)}</small>${m.pagado?'':' <span class="chip warn">Pendiente</span>'}</td><td class="n">${clp(m.total)}</td></tr>`).join('')}</tbody></table></div>`);
+  abrir(esc(k),`<div class="tbl"><table><thead><tr><th>Fecha</th><th>Proyecto</th><th>Cuenta</th><th class="n">Total</th></tr></thead><tbody>${L.map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td><small>${esc(m.obra_n)}</small></td><td><small>${esc(CTA(m.cuenta))}</small>${m.pagado?'':' <span class="chip warn">Pendiente</span>'}</td><td class="n">${clp(m.total)}</td></tr>`).join('')}</tbody></table></div>`);
 }
 V.clientes=()=>{
   const G={}; obras.forEach(o=>{const k=o.cliente||'(sin cliente)'; (G[k]=G[k]||[]).push(o);});
@@ -889,7 +890,7 @@ function buscarDlg(q){
   const body=()=>{const r=buscar($('#gq2').value)||{O:[],M:[],C:[]}; const n=r.O.length+r.M.length+r.C.length;
    return `<small class="sub">${n} resultado${n===1?'':'s'}</small>
    ${r.O.length?`<div><h3>Proyectos</h3><div class="tbl"><table><tbody>${r.O.slice(0,20).map(o=>`<tr class="click" data-obra="${o.id}"><td><b>${esc(o.nombre)}</b><br><small class="sub">${esc(o.cliente||'')} · ${o.id}</small></td><td>${o.abierta?'<span class="chip open">En curso</span>':'<span class="chip">Cerrado</span>'}</td><td class="n">${clp(o.pres_total)}<br><small class="sub">presupuesto con IVA</small></td></tr>`).join('')}</tbody></table></div></div>`:''}
-   ${r.M.length?`<div><h3>Movimientos${r.M.length>60?' (60 más recientes de '+r.M.length+')':''}</h3><div class="tbl"><table><tbody>${r.M.slice(0,60).map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td><b>${esc(m.quien)}</b><br><small class="sub">${esc(m.obra_n)} · ${esc(m.cuenta)}${m.ndoc?' · N° '+esc(m.ndoc):''}${m.detalle?' · '+esc(m.detalle.slice(0,50)):''}</small></td><td>${m.pagado?'':'<span class="chip warn">Pendiente</span>'}</td><td class="n ${m.tipo==='ingreso'?'pos':''}">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</td></tr>`).join('')}</tbody></table></div></div>`:''}
+   ${r.M.length?`<div><h3>Movimientos${r.M.length>60?' (60 más recientes de '+r.M.length+')':''}</h3><div class="tbl"><table><tbody>${r.M.slice(0,60).map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td><b>${esc(m.quien)}</b><br><small class="sub">${esc(m.obra_n)} · ${esc(CTA(m.cuenta))}${m.ndoc?' · N° '+esc(m.ndoc):''}${m.detalle?' · '+esc(m.detalle.slice(0,50)):''}</small></td><td>${m.pagado?'':'<span class="chip warn">Pendiente</span>'}</td><td class="n ${m.tipo==='ingreso'?'pos':''}">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</td></tr>`).join('')}</tbody></table></div></div>`:''}
    ${r.C.length?`<div><h3>Cotizaciones</h3><div class="tbl"><table><tbody>${r.C.map(c=>`<tr><td>${esc(c.nombre)}<br><small class="sub">${esc(c.cliente||'')}</small></td><td>${c.estado}</td><td class="n">${clp(c.neto+c.iva)}</td></tr>`).join('')}</tbody></table></div></div>`:''}
    ${!n?'<p class="sub">Nada encontrado. Prueba con parte del nombre, el N° de factura o el monto sin puntos.</p>':''}`;};
   $('#dlgB').innerHTML=body();
