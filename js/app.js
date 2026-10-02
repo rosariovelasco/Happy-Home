@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610011540';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610011540';
+import * as api from './api.js?v=202610021237';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021237';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -140,7 +140,7 @@ V.obras=()=>{
   <section class="card"><label style="margin-bottom:10px">Buscar obra<input id="fob" value="${esc(fob)}" placeholder="Nombre, cliente o código (busca también en obras antiguas)"></label><div class="spread" style="margin-bottom:10px"><div class="seg">${[['','Todas'],['abierta','En curso'],['cerrada','Cerradas'],['cuadrar','Por cuadrar']].map(([k,t])=>`<button type="button" data-fobr="${k}" aria-pressed="${fobr===k}">${t} <small>${obras.filter(o=>!k||(k==='abierta'?o.abierta:k==='cerrada'?(!o.abierta&&!noCuadrada(o)):(!o.abierta&&noCuadrada(o)))).length}</small></button>`).join('')}</div><div class="row solo-ros"><button class="btn" type="button" data-act="obra-new">+ Nueva obra</button><button class="btn ghost" type="button" data-go="cotizar">Desde cotización</button></div></div><div class="tbl"><table><thead><tr><th>Obra</th><th>Unidad</th><th>Estado</th><th class="n">Presupuesto neto</th><th class="n">Costo directo</th><th class="n">Margen obra</th><th class="n">%</th><th class="n">Queda para HH</th><th class="n">Queda para gastar</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 };
 function ficha(id){
-  const o=obrasAll.find(x=>x.id===id); if(!o) return;
+  const o=obrasAll.find(x=>x.id===id); if(!o) return; FICHA=id;
   const cc=o.un==='Construcción';
   const cob=o.pres_total?Math.min(100,o.cobrado_total/o.pres_total*100):0;
   $('#dlgT').innerHTML=`<h2 style="margin:0">${esc(o.nombre)}</h2><div class="row"><span class="chip ${o.un}">${o.un}</span>${o.abierta?'<span class="chip open dot">En curso</span>':noCuadrada(o)?'<span class="chip bad dot">Por cuadrar</span>':'<span class="chip dot">Cerrada</span>'}<small class="sub" style="margin:0">${esc(o.cliente||'')}${o.inicio?' · inicio '+fdate(o.inicio):''}</small></div>`;
@@ -362,7 +362,7 @@ const TIPOS=[
 ];
 let F={tipo:'pago',prov:'',obra:'',doc:'Factura',ndoc:'',monto:'',medio:'Cuenta 159-46332-07',fecha:HOY,socio:'Rosario',interes:'',adj:false,cuenta:'',pagado:true,llego:'',detalle:'',liga:''};
 const obrasSelF=()=>obras.filter(o=>o.abierta).concat(obras.filter(o=>!o.abierta));
-V.nuevo=()=>`<div><h1>${EDIT?'Corregir '+EDIT:'Registrar movimiento'}</h1><p class="sub">Primero eliges qué pasó. La app calcula el IVA, pide lo necesario y muestra cómo afecta cada número antes de guardar.</p>${EDIT?`<p class="note">Estás corrigiendo ${EDIT}. Al guardar se reemplaza y la versión anterior queda en el historial. <button class="x" type="button" data-act="cancel-edit">Cancelar</button></p>`:''}${F.liga?`<p class="note">Devolución ligada a ${F.liga}: restará costo de la misma obra.</p>`:''}</div>
+V.nuevo=()=>`<div><div class="row" style="justify-content:space-between"><h1>${EDIT?'Corregir '+EDIT:'Registrar movimiento'}</h1>${RET&&RET.v&&RET.v!=='nuevo'?'<button class="btn ghost" type="button" data-act="volver">← Volver sin guardar</button>':''}</div><p class="sub">Primero eliges qué pasó. La app calcula el IVA, pide lo necesario y muestra cómo afecta cada número antes de guardar.</p>${EDIT?`<p class="note">Estás corrigiendo ${EDIT}. Al guardar se reemplaza y la versión anterior queda en el historial. <button class="x" type="button" data-act="cancel-edit">Cancelar</button></p>`:''}${F.liga?`<p class="note">Devolución ligada a ${F.liga}: restará costo de la misma obra.</p>`:''}</div>
   <section class="card"><h2>¿Qué pasó?</h2><div class="types" id="types">${TIPOS.map(t=>`<button type="button" data-t="${t.k}" aria-pressed="${F.tipo===t.k}"><b>${t.t}</b><small>${t.d}</small></button>`).join('')}</div></section>
   <div class="grid g2"><section class="card"><form id="fm" class="form" novalidate></form></section>
   <section class="card"><h2>Así lo registra la app</h2><div class="effect" id="eff"></div><div id="warns" style="display:grid;gap:8px;margin-top:10px"></div>
@@ -481,7 +481,7 @@ async function guardar(c,t){
   if(F.tipo==='reembsocio'&&F.liga&&!EDIT){await api.actualizar('movimientos',F.liga,{pagado:true,fecha:base.fecha,detalle:((movById(F.liga)||{}).detalle||'')+' · devuelto con '+id}); extra.push(F.liga+' saldado');}
   toast((EDIT?'Corregido ':'Guardado ')+id+(extra.length?' + '+extra.join(', '):''));
   EDIT=null; F={...F,prov:'',ndoc:'',monto:'',interes:'',adj:false,cuenta:'',llego:'',detalle:'',liga:'',pagado:true,edoc:''};
-  await reload('nuevo');
+  await volver();
   }catch(e){console.error(e); toast('No se pudo guardar: '+(e.message||e));}
   finally{GUARDANDO=false;}
 }
@@ -539,12 +539,12 @@ function movDlg(id){
 async function marcarPagado(id){
   const m=movById(id); const f=$('#mp_f').value; const medio=$('#mp_c').value;
   try{ await api.actualizar('movimientos',id,{pagado:true,fecha:f,medio});
-    $('#dlg').close(); await reload(); toast('Marcado como pagado. Plata libre: '+clp(libre));
+    await refrescar(); toast('Marcado como pagado. Plata libre: '+clp(libre));
   }catch(e){toast('No se pudo: '+(e.message||e));}
 }
 async function anularMov(id){
   if(!confirm('¿Anular '+id+'? Deja de contar en todos los números, pero queda en el historial.')) return;
-  try{ await api.actualizar('movimientos',id,{anulado:true}); $('#dlg').close(); await reload(); toast(id+' anulado'); }catch(e){toast('No se pudo: '+(e.message||e));}
+  try{ await api.actualizar('movimientos',id,{anulado:true}); await refrescar(); toast(id+' anulado'); }catch(e){toast('No se pudo: '+(e.message||e));}
 }
 const MEDIOS=['Cuenta 159-46332-07','Cuenta 159-74413-10','Reserva F29 (cuenta Rosario)','TC de la casa','Cuenta personal socio'];
 const TIPO_DE={'Venta':'cobro','Costo directo':'pago','Estructura':'pago','Financiero':'pago','Recupero':'reemb','Pérdida':'nopago'};
@@ -554,12 +554,12 @@ function editarMov(id){
   const o=obraDe(m);
   F={...F,socio:/max/i.test(m.quien||'')?'Max':'Rosario',tipo:m.medio==='Cuenta personal socio'&&m.tipo==='egreso'?'socio':(m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso')?'reembsocio':TIPO_DE[m.nat]||(m.cuenta==='Retiro de socio'?'retiro':m.cuenta==='Pago F29 (IVA)'?'f29':m.cuenta==='Cuota de crédito'?'cuota':'traspaso'),prov:m.quien||'',obra:o?o.id:'',doc:['Nada','Factura','Boleta','Boleta de honorarios'].includes(m.doc)?m.doc:'Nada',ret:'hh',edoc:m.estado_doc||'',ndoc:m.ndoc||'',monto:String(m.total),fecha:m.fecha||HOY,cuenta:F.tipo==='pago'?'':'',pagado:m.pagado,llego:'',medio:m.medio||F.medio,detalle:m.detalle||'',liga:m.liga||''};
   if(['pago','socio'].includes(F.tipo)) F.cuenta=m.cuenta;
-  $('#dlg').close(); show('nuevo');
+  irNuevo();
 }
 function devolMov(id){
   const m=movById(id); const o=obraDe(m); EDIT=null;
   F={...F,tipo:'devol',prov:m.quien||'',obra:o?o.id:'',monto:'',ndoc:'',detalle:'Devolución ligada a '+id,liga:id};
-  $('#dlg').close(); show('nuevo');
+  irNuevo();
 }
 
 /* ---------- cierre de obra ---------- */
@@ -596,7 +596,7 @@ function cierre(id){
 }
 async function cerrarObra(id){
   const cierre={q:+($('#ci_q').value.replace(',','.'))||null,u:$('#ci_u').value,dias:+$('#ci_d').value||null,apr:$('#ci_a').value,fecha:HOY};
-  try{ await api.actualizar('obras',id,{estado:'cerrada',cierre}); $('#dlg').close(); await reload('obras'); toast('Obra cerrada. Su ficha ya aparece en el cotizador.'); }catch(e){toast('No se pudo: '+(e.message||e));}
+  try{ await api.actualizar('obras',id,{estado:'cerrada',cierre}); const y=window.scrollY; $('#dlg').close(); await reload(); window.scrollTo(0,y); toast('Obra cerrada. Su ficha ya aparece en el cotizador.'); }catch(e){toast('No se pudo: '+(e.message||e));}
 }
 
 /* ---------- cotizador ---------- */
@@ -686,14 +686,14 @@ async function mesSiguiente(id){
   const nombre=sig?o.nombre.replace(re,sig[0].toUpperCase()+sig.slice(1)):o.nombre+' (mes siguiente)';
   if(DB.obras.some(x=>nrm(x.nombre)===nrm(nombre))){toast('Ya existe '+nombre);return;}
   try{ const n=(await api.insertar('obras',{nombre,un:o.un,cliente:o.cliente,estado:'en_curso',inicio:HOY,pres_neto:o.pres_neto,pres_total:o.pres_total,costo_est:o.costo_est}))[0];
-    $('#dlg').close(); await reload('obras'); toast(nombre+' creada ('+n.id+')'); }catch(e){toast('No se pudo: '+(e.message||e));}
+    const y=window.scrollY; $('#dlg').close(); await reload(); window.scrollTo(0,y); ficha(n.id); toast(nombre+' creada ('+n.id+')'); }catch(e){toast('No se pudo: '+(e.message||e));}
 }
 async function obraSave(id){
   const t=+($('#o_t').value.replace(/\D/g,''))||0;
   const row={nombre:$('#o_n').value.trim(),cliente:$('#o_c').value.trim(),un:$('#o_u').value,inicio:$('#o_i').value||null,pres_total:t,pres_neto:Math.round(t/1.19),costo_est:+($('#o_e').value.replace(/\D/g,''))||0,notas:$('#o_no').value||null};
   if(!row.nombre||!row.cliente){toast('Falta nombre o cliente');return;}
-  try{ if(id) await api.actualizar('obras',id,row); else await api.insertar('obras',{...row,estado:'en_curso'});
-    $('#dlg').close(); await reload('obras'); toast(id?'Obra actualizada':'Obra creada'); }catch(e){toast('No se pudo: '+(e.message||e));}
+  try{ let nid=id; if(id) await api.actualizar('obras',id,row); else nid=(await api.insertar('obras',{...row,estado:'en_curso'}))[0].id;
+    const y=window.scrollY; $('#dlg').close(); await reload(); window.scrollTo(0,y); ficha(nid); toast(id?'Obra actualizada':'Obra creada'); }catch(e){toast('No se pudo: '+(e.message||e));}
 }
 
 
@@ -900,8 +900,12 @@ function buscarDlg(q){
 
 /* ---------- navegación ---------- */
 let cur='inicio';
+let RET=null, FICHA=null; // a dónde volver después de guardar · ficha abierta en el diálogo
+function irNuevo(){RET={v:cur==='nuevo'?(RET&&RET.v)||'inicio':cur,y:window.scrollY,ficha:$('#dlg').open?FICHA:null}; $('#dlg').close(); show('nuevo');}
+async function volver(){const r=RET; RET=null; if(r&&r.v&&r.v!=='nuevo'){await reload(r.v); window.scrollTo(0,r.y||0); if(r.ficha) ficha(r.ficha);} else await reload('nuevo');}
+async function refrescar(){const f=$('#dlg').open?FICHA:null, y=window.scrollY; $('#dlg').close(); await reload(); window.scrollTo(0,y); if(f) ficha(f);}
 const TAB_DE=v=>SUB[v]?'mas':v;
-function show(v){cur=v;document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-current',b.dataset.v===TAB_DE(v)?'page':'false'));
+function show(v){if(v==='nuevo'&&cur!=='nuevo'&&!RET) RET={v:cur,y:window.scrollY,ficha:null}; if(v!=='nuevo') RET=null; cur=v;document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-current',b.dataset.v===TAB_DE(v)?'page':'false'));
   $('#app').innerHTML=V[v](); window.scrollTo(0,0);
   if(v==='movs'){movTable(); ['fq','fnat','fobra','fest'].forEach(id=>$('#'+id).addEventListener('input',e=>{({fq:()=>fq=e.target.value,fnat:()=>fnat=e.target.value,fobra:()=>fobra=e.target.value,fest:()=>fest=e.target.value})[id](); movTable();}));}
   if(v==='nuevo'){formHTML(); $('#types').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;F.tipo=b.dataset.t;F.cuenta='';F.liga='';document.querySelectorAll('#types button').forEach(x=>x.setAttribute('aria-pressed',x===b));formHTML();});
@@ -917,18 +921,19 @@ function onClick(e){
   const a=e.target.closest('[data-act]');
   if(a){const id=a.dataset.id; e.preventDefault();
     ({pagar:()=>marcarPagado(id),editar:()=>editarMov(id),devol:()=>devolMov(id),cierre:()=>cierre(id),cerrar:()=>cerrarObra(id),
-      'ir-cobro':()=>{EDIT=null;F={...F,tipo:'cobro',obra:id,monto:'',liga:''};$('#dlg').close();show('nuevo');},
-      'ir-nopago':()=>{const o=obras.find(x=>x.id===id);EDIT=null;F={...F,tipo:'nopago',obra:id,monto:String(o.por_cobrar),liga:''};$('#dlg').close();show('nuevo');},
+      'ir-cobro':()=>{EDIT=null;F={...F,tipo:'cobro',obra:id,monto:'',liga:''};irNuevo();},
+      'ir-nopago':()=>{const o=obras.find(x=>x.id===id);EDIT=null;F={...F,tipo:'nopago',obra:id,monto:String(o.por_cobrar),liga:''};irNuevo();},
       'q-save':qSave,'q-ok':()=>qAprobar(+id),'q-no':()=>qRechazar(+id),anular:()=>anularMov(id),
       rapido:()=>rapido(id),'fijo-reg':()=>fijoRegistrar(+id),
       'mes-sig':()=>mesSiguiente(id),
-      'doc-ok':async()=>{try{await api.actualizar('movimientos',id,{estado_doc:'ok'}); const op=$('#dlg').open; if(op) $('#dlg').close(); await reload(); toast('Documento marcado');}catch(e){toast('No se pudo: '+(e.message||e));}},
-      'ob-reg':()=>{EDIT=null; F={...F,tipo:a.dataset.t,obra:id,prov:'',monto:'',ndoc:'',detalle:'',liga:'',cuenta:'',llego:'',pagado:true,fecha:HOY}; $('#dlg').close(); show('nuevo'); toast('Registrando en '+((obrasAll.find(o=>o.id===id)||{}).nombre||id));},
+      'doc-ok':async()=>{try{await api.actualizar('movimientos',id,{estado_doc:'ok'}); await refrescar(); toast('Documento marcado');}catch(e){toast('No se pudo: '+(e.message||e));}},
+      'ob-reg':()=>{EDIT=null; F={...F,tipo:a.dataset.t,obra:id,prov:'',monto:'',ndoc:'',detalle:'',liga:'',cuenta:'',llego:'',pagado:true,fecha:HOY}; irNuevo(); toast('Registrando en '+((obrasAll.find(o=>o.id===id)||{}).nombre||id));},
       'obra-new':()=>obraForm(null),'obra-edit':()=>obraForm(id),'obra-save':()=>obraSave(id||null),
-      'cancel-edit':()=>{EDIT=null;F={...F,prov:'',monto:'',ndoc:'',liga:''};show('nuevo');},
+      'cancel-edit':()=>{EDIT=null;F={...F,prov:'',monto:'',ndoc:'',liga:''};volver();},
+      volver:()=>{EDIT=null;F={...F,prov:'',monto:'',ndoc:'',liga:''};volver();},
       print:()=>window.print(),
       subir:()=>toast('Por ahora mándame la cartola o el RCV y yo los cargo. La carga directa viene después.'),
-      crear:()=>{const b=D.banco[+a.dataset.b];EDIT=null;F={...F,tipo:b.monto>0?'cobro':'pago',prov:b.desc.split(':').pop().trim(),monto:String(Math.abs(b.monto)),fecha:b.fecha,pagado:true,liga:''};show('nuevo');}
+      crear:()=>{const b=D.banco[+a.dataset.b];EDIT=null;F={...F,tipo:b.monto>0?'cobro':'pago',prov:b.desc.split(':').pop().trim(),monto:String(Math.abs(b.monto)),fecha:b.fecha,pagado:true,liga:''};irNuevo();}
     })[a.dataset.act]?.(); return;}
   const g=e.target.closest('[data-go]'); if(g){show(g.dataset.go);return;}
   const k=e.target.closest('[data-k]');if(k){k.dataset.k==='libre'?abrir('Plata libre hoy: de dónde sale',desgloseLibre()):abrir('Por cobrar',desgloseCobrar());return;}
@@ -944,6 +949,7 @@ $('#dlgB').addEventListener('click',onClick);
 $('#dlgT').addEventListener('click',onClick);
 $('#app').addEventListener('change',e=>{if(e.target.dataset.plan){plan[e.target.dataset.plan].sem=+e.target.value; const y=window.scrollY; show('caja'); window.scrollTo(0,y);}});
 $('#dlgX').addEventListener('click',()=>$('#dlg').close());
+$('#dlg').addEventListener('close',()=>{FICHA=null;});
 $('#glosBtn').addEventListener('click',()=>{$('#dlgT').innerHTML='<h2 style="margin:0">Qué significa cada cosa</h2>';$('#dlgB').innerHTML=`<dl class="gl">
 <dt>Costo directo</dt><dd>Lo que existe solo porque hay una obra: materiales, subcontratos, fletes, retiro de escombros y la participación de Casa Construcción. Siempre va con obra.</dd>
 <dt>Gastos generales (General HH)</dt><dd>Lo que cuesta mantener la empresa aunque no haya obras: contador, Previred, teléfono, vehículo, marketing, patentes.</dd>
