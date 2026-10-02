@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610021250';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021250';
+import * as api from './api.js?v=202610021701';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021701';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -278,8 +278,8 @@ function movTable(){
   let L=D.movs.filter(m=>m.pagado&&(!fnat||m.nat===fnat)&&(!fobra||m.obra_n===fobra)&&(!fest||(m.estado_doc||'no_aplica')===fest)
     &&(!q||((m.quien||'')+' '+(m.detalle||'')+' '+(m.ndoc||'')+' '+m.cuenta).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').includes(q)||(qd&&String(m.total).includes(qd))));
   const n=L.length; L=L.slice(0,150);
-  $('#movT').innerHTML=`<small class="sub">${n} movimientos${n>150?' · se muestran los 150 más recientes':''}</small><div class="tbl"><table><thead><tr><th>Fecha</th><th>Quién</th><th>Qué es</th><th>Obra</th><th>Doc.</th><th class="n">Total</th><th class="n">IVA</th></tr></thead><tbody>
-  ${L.map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td>${esc(m.quien)}${m.detalle?`<br><small class="sub">${esc(m.detalle.slice(0,60))}</small>`:''}</td><td><span class="chip ${m.nat==='Venta'?'open':m.nat==='Pérdida'?'bad':''}">${esc(m.cuenta)}</span>${esFijo(m)?' <span class="chip">fijo</span>':''}${edocChip(m)}</td><td><small>${esc(m.obra_n)}</small></td><td><small>${esc(m.doc)}${m.ndoc?' '+esc(m.ndoc):''}</small></td><td class="n ${m.tipo==='ingreso'?'pos':''}">${m.tipo==='ingreso'?'+':''}${clp(m.total)}</td><td class="n">${m.iva?clp(m.iva):'—'}</td></tr>`).join('')}</tbody></table></div>`;
+  $('#movT').innerHTML=`<small class="sub">${n} movimientos${n>150?' · se muestran los 150 más recientes':''}</small><div class="tbl"><table><thead><tr><th>Fecha</th><th>Quién</th><th>Qué es</th><th>Obra</th><th>Doc.</th><th class="n">Neto</th><th class="n">IVA</th><th class="n">Total</th></tr></thead><tbody>
+  ${L.map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td>${esc(m.quien)}${m.detalle?`<br><small class="sub">${esc(m.detalle.slice(0,60))}</small>`:''}</td><td><span class="chip ${m.nat==='Venta'?'open':m.nat==='Pérdida'?'bad':''}">${esc(m.cuenta)}</span>${esFijo(m)?' <span class="chip">fijo</span>':''}${edocChip(m)}</td><td><small>${esc(m.obra_n)}</small></td><td><small>${esc(m.doc)}${m.ndoc?' '+esc(m.ndoc):''}</small></td><td class="n">${clp(m.neto)}</td><td class="n">${m.iva?clp(m.iva):'—'}</td><td class="n ${m.tipo==='ingreso'?'pos':''}"><b>${m.tipo==='ingreso'?'+':''}${clp(m.total)}</b></td></tr>`).join('')}</tbody></table></div>`;
 }
 function rapido(id){
   const m=movById(id); if(!m) return;
