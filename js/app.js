@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610021912';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021912';
+import * as api from './api.js?v=202610021920';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021920';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -100,13 +100,22 @@ function desgloseCobrar(){
 function abrir(t,html){$('#dlgT').innerHTML=`<h2 style="margin:0">${t}</h2>`;$('#dlgB').innerHTML=html;$('#dlg').showModal();}
 /* ---------- vistas ---------- */
 const V={};
+// retiros que cuentan desde abril: un "sueldo <mes>" de un mes anterior se paga en abril pero corresponde a ese mes
+function retirosPeriodo(){
+  const MS=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return D.movs.filter(m=>{ if(m.cuenta!=='Retiro de socio'||!m.pagado||m.anulado||(m.fecha||'')<'2026-04-01') return false;
+    const k=(m.detalle||'').toLowerCase().match(/sueldo\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/);
+    if(!k) return true; const mi=MS.indexOf(k[1])+1, y=+m.fecha.slice(0,4)-(mi>+m.fecha.slice(5,7)?1:0);
+    return `${y}-${String(mi).padStart(2,'0')}`>='2026-04'; });
+}
 function salud(){
   const generado=tot.mc-sum(obras.map(ccPendiente))-(tot.e+tot.f);
-  const retirado=sum(D.movs.filter(m=>m.cuenta==='Retiro de socio'&&m.pagado&&(m.fecha||'')>='2026-04-01').map(m=>m.total));
+  const RL=retirosPeriodo();
+  const retirado=sum(RL.map(m=>m.total)), deRos=sum(RL.filter(m=>/rosario/i.test(m.quien||'')).map(m=>m.total));
   const nm=meses.filter(mm=>mm<HOY.slice(0,7)).length||1;
   const porMes=Math.max(0,Math.round(generado/nm));
   const hoyo=Math.max(0,retirado-generado);
-  return {generado,retirado,nm,porMes,hoyo,meses:porMes?Math.ceil(hoyo/porMes):null};
+  return {generado,retirado,deRos,nm,porMes,hoyo,meses:porMes?Math.ceil(hoyo/porMes):null};
 }
 V.inicio=()=>{
   const alerts=[];
@@ -117,7 +126,7 @@ V.inicio=()=>{
   const SA=salud();
   const alarma=(SA.hoyo>0||libre<0)?`<section class="alarma"><div class="al-t">⚠ ${SA.hoyo>0?`Hay un hoyo de ${clp(SA.hoyo)}`:'No hay plata libre'}</div>
    <div class="al-g">
-    ${SA.hoyo>0?`<div><span>Desde abril HH ganó</span><b>${clp(SA.generado)}</b><small>margen HH − gastos generales</small></div><div><span>Los socios retiraron</span><b class="negc">${clp(SA.retirado)}</b><small>${clp(Math.round(SA.retirado/SA.nm))} al mes en promedio</small></div><div><span>Diferencia (plata de proyectos y de CC)</span><b class="negc">−${clp(SA.hoyo)}</b><small>se sacó más de lo que se ganó</small></div>`:''}
+    ${SA.hoyo>0?`<div><span>Desde abril HH ganó</span><b>${clp(SA.generado)}</b><small>margen HH − gastos generales</small></div><div><span>Retiros de Max</span><b class="negc">${clp(SA.retirado)}</b><small>${clp(Math.round(SA.retirado/SA.nm))} al mes${SA.deRos?' · incluye '+clp(SA.deRos)+' de Rosario':''}</small></div><div><span>Diferencia (plata de proyectos y de CC)</span><b class="negc">−${clp(SA.hoyo)}</b><small>se sacó más de lo que se ganó</small></div>`:''}
     <div><span>Plata libre hoy</span><b class="${libre<0?'negc':'pos'}">${clp(libre)}</b><small>después de apartar todo lo comprometido</small></div>
     <div><span>Se le debe a Casa Construcción</span><b>${clp(ccPend)}</b><small>participación, con IVA</small></div>
    </div>
@@ -743,14 +752,14 @@ V.reparto=()=>{
   // ¿cuánto puedo sacar? (desde abril)
   const ccPendNeto=sum(obras.map(ccPendiente));
   const generadoHH=tot.mc-ccPendNeto-(tot.e+tot.f);
-  const retirado=sum(D.movs.filter(m=>m.cuenta==='Retiro de socio'&&m.pagado&&(m.fecha||'')>='2026-04-01').map(m=>m.total));
+  const retirado=sum(retirosPeriodo().map(m=>m.total));
   const nm=meses.filter(mm=>mm<HOY.slice(0,7)).length||1;
   const sueldoSost=Math.max(0,Math.round(generadoHH/nm));
   return `<div>${backBtn}<h1>Reparto del mes</h1><p class="sub">Cuánto se puede repartir de cada proyecto en curso sin dejarla sin plata, y cuánto puede sacar Happy Home. Montos de plata con IVA; el cálculo por proyecto es sin IVA para que cuadre con el margen.</p></div>
   <section class="card"><div class="grid g4">
    <div class="kpi"><span>Transferir a Casa Construcción</span><b>${clp(totCCiva)}</b><small>con IVA · ${paraCC>=totCCiva?'la caja alcanza':`<span class="negc">la caja alcanza solo para ${clp(Math.max(0,paraCC))}: faltan ${clp(totCCiva-Math.max(0,paraCC))}</span>`}</small></div>
    <div class="kpi"><span>Puede sacar Happy Home</span><b class="${Math.min(totHH,libre)<=0?'negc':'pos'}">${clp(Math.max(0,Math.min(totHH,libre)))}</b><small>según las obras: ${clp(totHH)} · plata libre: ${clp(libre)}</small></div>
-   <div class="kpi"><span>Sueldo sostenible (promedio)</span><b>${clp(sueldoSost)}</b><small>al mes, entre los socios, con lo que ha generado HH desde abril</small></div>
+   <div class="kpi"><span>Sueldo sostenible (promedio)</span><b>${clp(sueldoSost)}</b><small>al mes, con lo que ha generado HH desde abril</small></div>
    <div class="kpi"><span>Generado vs. retirado desde abril</span><b class="${retirado>generadoHH?'negc':'pos'}">${clp(generadoHH-retirado)}</b><small>generado ${clp(generadoHH)} · retirado ${clp(retirado)}</small></div>
   </div>
   ${libre<0?`<p class="note bad"><b>Hoy no hay plata libre (${clp(libre)}).</b> Aunque los proyectos digan que hay para repartir, esa plata ya se usó en otras cosas (gastos generales, retiros de meses anteriores, otros proyectos). Se reparte cuando entren los próximos cobros.</p>`:totHH>libre?`<p class="note">Los proyectos permiten más de lo que hay en caja: el límite es la plata libre (${clp(libre)}).</p>`:''}</section>
