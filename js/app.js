@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610021237';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021237';
+import * as api from './api.js?v=202610021250';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021250';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -255,7 +255,7 @@ V.movs=()=>{
   const pend=D.movs.filter(m=>!m.pagado);
   const pp=pend.filter(m=>m.tipo==='egreso'&&m.nat!=='Pérdida'), pc=pend.filter(m=>m.tipo==='ingreso'&&['Venta','Recupero'].includes(m.nat));
   const ord=L=>L.slice().sort((a,b)=>(a.fecha||'0000').localeCompare(b.fecha||'0000'));
-  const lista=(L,ing)=>L.length?`<div class="tbl"><table><tbody>${ord(L).map(m=>`<tr data-mov="${m.id}"><td class="num">${m.fecha?fdate(m.fecha):'<span class="negc">sin fecha</span>'}</td><td><b>${esc(m.quien)}</b><br><small class="sub">${esc(m.obra_n)}${m.detalle?' · '+esc(m.detalle.slice(0,45)):''}</small></td><td class="n">${clp(m.total)}</td><td class="solo-ros"><button class="x" type="button" data-act="rapido" data-id="${m.id}">Pagado</button></td></tr>`).join('')}
+  const lista=(L,ing)=>L.length?`<div class="tbl"><table><tbody>${ord(L).map(m=>`<tr data-mov="${m.id}"><td class="num">${m.fecha?fdate(m.fecha):'<span class="negc">sin fecha</span>'}</td><td><b>${esc(m.quien)}</b><br><small class="sub">${esc(m.obra_n)}${m.detalle?' · '+esc(m.detalle.slice(0,45)):''}</small></td><td class="n">${clp(m.total)}</td><td class="solo-ros"><button class="x" type="button" data-act="rapido" data-id="${m.id}">${ing?'Marcar recibido':'Marcar pagado'}</button></td></tr>`).join('')}
     <tr class="tot"><td colspan="2">Total</td><td class="n">${clp(sum(L.map(m=>m.total)))}</td><td class="solo-ros"></td></tr></tbody></table></div>`:'<p class="sub">Nada pendiente.</p>';
   return `<div><h1>Movimientos</h1><p class="sub">Arriba lo que falta pagar o cobrar; abajo lo ya realizado. Toca cualquiera para ver el detalle o corregirlo.</p></div>
   <div class="grid g2">
@@ -344,7 +344,7 @@ function fijoRegistrar(i){
   const f=FIJOS[i]; const r=V.fijos&&null; EDIT=null;
   const prev=D.movs.filter(m=>m.pagado&&fijoDe(m)===f).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''))[0];
   F={...F,tipo:f.cuenta==='Cuota de crédito'?'cuota':f.impuesto?'f29':'pago',prov:prev?prev.quien:f.n,obra:'',doc:prev?prev.doc:'Nada',ndoc:'',monto:prev?String(prev.total):'',fecha:HOY,cuenta:f.noafecta?'':f.cuenta,pagado:true,detalle:prev&&prev.detalle?prev.detalle:'',liga:'',medio:prev&&prev.medio||F.medio};
-  show('nuevo');
+  COMPACTO=true; show('nuevo');
 }
 /* registrar */
 const TIPOS=[
@@ -362,8 +362,8 @@ const TIPOS=[
 ];
 let F={tipo:'pago',prov:'',obra:'',doc:'Factura',ndoc:'',monto:'',medio:'Cuenta 159-46332-07',fecha:HOY,socio:'Rosario',interes:'',adj:false,cuenta:'',pagado:true,llego:'',detalle:'',liga:''};
 const obrasSelF=()=>obras.filter(o=>o.abierta).concat(obras.filter(o=>!o.abierta));
-V.nuevo=()=>`<div><div class="row" style="justify-content:space-between"><h1>${EDIT?'Corregir '+EDIT:'Registrar movimiento'}</h1>${RET&&RET.v&&RET.v!=='nuevo'?'<button class="btn ghost" type="button" data-act="volver">← Volver sin guardar</button>':''}</div><p class="sub">Primero eliges qué pasó. La app calcula el IVA, pide lo necesario y muestra cómo afecta cada número antes de guardar.</p>${EDIT?`<p class="note">Estás corrigiendo ${EDIT}. Al guardar se reemplaza y la versión anterior queda en el historial. <button class="x" type="button" data-act="cancel-edit">Cancelar</button></p>`:''}${F.liga?`<p class="note">Devolución ligada a ${F.liga}: restará costo de la misma obra.</p>`:''}</div>
-  <section class="card"><h2>¿Qué pasó?</h2><div class="types" id="types">${TIPOS.map(t=>`<button type="button" data-t="${t.k}" aria-pressed="${F.tipo===t.k}"><b>${t.t}</b><small>${t.d}</small></button>`).join('')}</div></section>
+V.nuevo=()=>`<div><div class="row" style="justify-content:space-between"><h1>${EDIT?'Corregir '+EDIT:'Registrar movimiento'}</h1>${RET&&RET.v&&RET.v!=='nuevo'?'<button class="btn ghost" type="button" data-act="volver">← Volver sin guardar</button>':''}</div>${COMPACTO?'':`<p class="sub">Primero eliges qué pasó. La app calcula el IVA, pide lo necesario y muestra cómo afecta cada número antes de guardar.</p>`}${EDIT?`<p class="note">Estás corrigiendo ${EDIT}. Al guardar se reemplaza y la versión anterior queda en el historial. <button class="x" type="button" data-act="cancel-edit">Cancelar</button></p>`:''}${F.liga?`<p class="note">Devolución ligada a ${F.liga}: restará costo de la misma obra.</p>`:''}</div>
+  <section class="card">${COMPACTO?`<div class="row" style="justify-content:space-between"><b>${esc((TIPOS.find(x=>x.k===F.tipo)||{}).t||'')}</b><button class="x" type="button" data-act="ver-tipos">Cambiar tipo</button></div>`:'<h2>¿Qué pasó?</h2>'}<div class="types" id="types"${COMPACTO?' style="display:none"':''}>${TIPOS.map(t=>`<button type="button" data-t="${t.k}" aria-pressed="${F.tipo===t.k}"><b>${t.t}</b><small>${t.d}</small></button>`).join('')}</div></section>
   <div class="grid g2"><section class="card"><form id="fm" class="form" novalidate></form></section>
   <section class="card"><h2>Así lo registra la app</h2><div class="effect" id="eff"></div><div id="warns" style="display:grid;gap:8px;margin-top:10px"></div>
   <div class="row" style="margin-top:14px"><button class="btn" id="save" type="button">Guardar</button></div></section></div>`;
@@ -900,12 +900,12 @@ function buscarDlg(q){
 
 /* ---------- navegación ---------- */
 let cur='inicio';
-let RET=null, FICHA=null; // a dónde volver después de guardar · ficha abierta en el diálogo
-function irNuevo(){RET={v:cur==='nuevo'?(RET&&RET.v)||'inicio':cur,y:window.scrollY,ficha:$('#dlg').open?FICHA:null}; $('#dlg').close(); show('nuevo');}
-async function volver(){const r=RET; RET=null; if(r&&r.v&&r.v!=='nuevo'){await reload(r.v); window.scrollTo(0,r.y||0); if(r.ficha) ficha(r.ficha);} else await reload('nuevo');}
+let RET=null, FICHA=null, COMPACTO=false; // a dónde volver después de guardar · ficha abierta en el diálogo
+function irNuevo(){COMPACTO=true; RET={v:cur==='nuevo'?(RET&&RET.v)||'inicio':cur,y:window.scrollY,ficha:$('#dlg').open?FICHA:null}; $('#dlg').close(); show('nuevo');}
+async function volver(){const r=RET; RET=null; COMPACTO=false; if(r&&r.v&&r.v!=='nuevo'){await reload(r.v); window.scrollTo(0,r.y||0); if(r.ficha) ficha(r.ficha);} else await reload('nuevo');}
 async function refrescar(){const f=$('#dlg').open?FICHA:null, y=window.scrollY; $('#dlg').close(); await reload(); window.scrollTo(0,y); if(f) ficha(f);}
 const TAB_DE=v=>SUB[v]?'mas':v;
-function show(v){if(v==='nuevo'&&cur!=='nuevo'&&!RET) RET={v:cur,y:window.scrollY,ficha:null}; if(v!=='nuevo') RET=null; cur=v;document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-current',b.dataset.v===TAB_DE(v)?'page':'false'));
+function show(v){if(v==='nuevo'&&cur!=='nuevo'&&!RET) RET={v:cur,y:window.scrollY,ficha:null}; if(v!=='nuevo'){RET=null; COMPACTO=false;} cur=v;document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-current',b.dataset.v===TAB_DE(v)?'page':'false'));
   $('#app').innerHTML=V[v](); window.scrollTo(0,0);
   if(v==='movs'){movTable(); ['fq','fnat','fobra','fest'].forEach(id=>$('#'+id).addEventListener('input',e=>{({fq:()=>fq=e.target.value,fnat:()=>fnat=e.target.value,fobra:()=>fobra=e.target.value,fest:()=>fest=e.target.value})[id](); movTable();}));}
   if(v==='nuevo'){formHTML(); $('#types').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;F.tipo=b.dataset.t;F.cuenta='';F.liga='';document.querySelectorAll('#types button').forEach(x=>x.setAttribute('aria-pressed',x===b));formHTML();});
@@ -916,7 +916,7 @@ function show(v){if(v==='nuevo'&&cur!=='nuevo'&&!RET) RET={v:cur,y:window.scroll
   if(v==='obras'){const f=$('#fob'); f.addEventListener('input',()=>{fob=f.value; const pos=f.selectionStart; show('obras'); const g=$('#fob'); g.focus(); g.setSelectionRange(pos,pos);});}
   if(v==='reporte') $('#repM').addEventListener('change',e=>{repM=e.target.value; show('reporte');});
 }
-$('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b){if(b.dataset.v==='nuevo'&&!EDIT&&!F.liga){} show(b.dataset.v);}});
+$('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b){COMPACTO=false;if(b.dataset.v==='nuevo'&&!EDIT&&!F.liga){} show(b.dataset.v);}});
 function onClick(e){
   const a=e.target.closest('[data-act]');
   if(a){const id=a.dataset.id; e.preventDefault();
@@ -929,6 +929,7 @@ function onClick(e){
       'doc-ok':async()=>{try{await api.actualizar('movimientos',id,{estado_doc:'ok'}); await refrescar(); toast('Documento marcado');}catch(e){toast('No se pudo: '+(e.message||e));}},
       'ob-reg':()=>{EDIT=null; F={...F,tipo:a.dataset.t,obra:id,prov:'',monto:'',ndoc:'',detalle:'',liga:'',cuenta:'',llego:'',pagado:true,fecha:HOY}; irNuevo(); toast('Registrando en '+((obrasAll.find(o=>o.id===id)||{}).nombre||id));},
       'obra-new':()=>obraForm(null),'obra-edit':()=>obraForm(id),'obra-save':()=>obraSave(id||null),
+      'ver-tipos':()=>{$('#types').style.display=''; a.closest('.row').style.display='none';},
       'cancel-edit':()=>{EDIT=null;F={...F,prov:'',monto:'',ndoc:'',liga:''};volver();},
       volver:()=>{EDIT=null;F={...F,prov:'',monto:'',ndoc:'',liga:''};volver();},
       print:()=>window.print(),

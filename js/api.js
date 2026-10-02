@@ -1,5 +1,5 @@
 // Acceso a datos. Producción: Supabase. Prueba local (?demo en localhost): db/seed.json en memoria.
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=202610021237';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=202610021250';
 
 const DEMO = /[?&]demo\b/.test(location.search) && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 let sb = null, mem = null;
