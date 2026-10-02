@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610021722';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021722';
+import * as api from './api.js?v=202610021727';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021727';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -115,8 +115,8 @@ V.inicio=()=>{
   <section class="card"><div class="grid g4 kini">
     ${(()=>{const C_=obras.filter(o=>!o.abierta), A_=obras.filter(o=>o.abierta); const sm=(L,k)=>sum(L.map(o=>o[k]||0));
       const genHH=tot.mc-sum(obras.map(ccPendiente))-(tot.e+tot.f);
-      return `<button type="button" class="kpi kbtn" data-fobr-go="cerrada"><span>Margen HH · proyectos cerrados desde abril</span><b>${clp(sm(C_,'margen_hh'))}</b><small>sin IVA · ${C_.length} proyectos: margen ${clp(sm(C_,'margen'))} − reparto CC ${clp(sm(C_,'cc_parte'))}</small><small class="ver">Ver proyectos →</small></button>
-    <button type="button" class="kpi kbtn" data-fobr-go="abierta"><span>Margen HH proyectado · en curso</span><b>${clp(sm(A_,'margen_hh'))}</b><small>sin IVA · ${A_.length} proyectos: margen ${clp(sm(A_,'margen'))} − reparto CC ${clp(sm(A_,'cc_parte'))}</small><small class="ver">Ver proyectos →</small></button>
+      return `<button type="button" class="kpi kbtn" data-fobr-go="cerrada"><span>Margen HH · proyectos cerrados desde abril</span><b>${clp(sm(C_,'margen'))}</b><small>sin IVA · ${C_.length} proyectos · de eso, reparto CC ${clp(sm(C_,'cc_parte'))} y quedan ${clp(sm(C_,'margen_hh'))}</small><small class="ver">Ver proyectos →</small></button>
+    <button type="button" class="kpi kbtn" data-fobr-go="abierta"><span>Margen HH proyectado · en curso</span><b>${clp(sm(A_,'margen'))}</b><small>sin IVA · ${A_.length} proyectos · de eso, reparto CC ${clp(sm(A_,'cc_parte'))} y quedan ${clp(sm(A_,'margen_hh'))}</small><small class="ver">Ver proyectos →</small></button>
     <button type="button" class="kpi kbtn" data-go="reparto"><span>Utilidad HH desde abril</span><b class="${genHH>=0?'pos':'negc'}">${clp(genHH)}</b><small>sin IVA · margen HH − gastos generales</small><small class="ver">Ver reparto →</small></button>`;})()}
     <button type="button" class="kpi kbtn" data-k="libre"><span>Plata libre hoy</span><b class="${libre>=0?'pos':'negc'}">${clp(libre)}</b><small>banco ${clp(cajaTotal)} − comprometido ${clp(cajaTotal-libre)}</small><small class="ver">Ver de dónde sale →</small></button>
     <button type="button" class="kpi kbtn" data-k="cobrar"><span>Por cobrar a clientes</span><b>${clp(porCobrar)}</b><small>con IVA · lo que todavía deben pagar</small><small class="ver">Ver detalle →</small></button>
