@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610021933';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610021933';
+import * as api from './api.js?v=202610141500';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610141500';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -447,13 +447,13 @@ function formHTML(){
 }
 function bindForm(){
   const map={f_edoc:'edoc',f_ret:'ret',f_prov:'prov',f_obra:'obra',f_doc:'doc',f_ndoc:'ndoc',f_monto:'monto',f_medio:'medio',f_fecha:'fecha',f_socio:'socio',f_int:'interes',f_cuenta:'cuenta',f_llego:'llego',f_det:'detalle',f_liga:'liga'};
-  const fpv=document.getElementById('f_prov'); if(fpv&&!EDIT) fpv.addEventListener('change',()=>{const k=nrm(fpv.value.trim()); if(!k) return; const u=D.movs.find(m=>m.tipo==='egreso'&&nrm(m.quien||'')===k&&m.quien!=='SII · retención honorarios'); if(u){ const cambioDoc=u.doc&&u.doc!==F.doc; if(cambioDoc){F.doc=u.doc; F.edoc='';} if(['pago','socio'].includes(F.tipo)&&!F.cuenta) F.cuenta=u.cuenta;
+  const fpv=document.getElementById('f_prov'); if(fpv&&!EDIT) fpv.addEventListener('change',()=>{const k=nrm(fpv.value.trim()); if(!k) return; const u=D.movs.find(m=>m.tipo==='egreso'&&nrm(m.quien||'')===k&&m.quien!=='SII · retención honorarios'); if(u){ const cambioDoc=u.doc&&u.doc!==F.doc; if(cambioDoc){F.doc=u.doc; F.edoc='';} if(['pago','socio'].includes(F.tipo)&&!F.cuenta){F.cuenta=u.cuenta; F.cuentaAuto=true;}
       setTimeout(()=>{const foco=document.activeElement&&document.activeElement.id; if(cambioDoc) formHTML(); else {const c=document.getElementById('f_cuenta'); if(c) c.value=F.cuenta; effects();} if(foco&&document.getElementById(foco)) document.getElementById(foco).focus();},0);
       toast('Documento y cuenta de la última vez: '+u.doc+' · '+u.cuenta);}});
   const fd=document.getElementById('f_doc'); if(fd) fd.addEventListener('change',()=>{F.doc=fd.value; F.edoc=fd.value==='Nada'?'no_aplica':''; formHTML();});
   const pg=document.getElementById('f_pag'); if(pg) pg.addEventListener('input',()=>{F.pagado=pg.value==='1'; effects();});
   const lg=document.getElementById('f_liga'); if(lg) lg.addEventListener('change',()=>{const m=movById(lg.value); if(m){F.monto=String(m.total); F.socio=/max/i.test(m.quien)?'Max':'Rosario'; formHTML();}});
-  Object.entries(map).forEach(([id,k])=>{const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{F[k]=el.value; if(k==='prov'){const p=D.proveedores[titleCase(el.value)]; if(p&&!F.cuenta){ /* sugerencia */ }} effects();})});
+  Object.entries(map).forEach(([id,k])=>{const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{F[k]=el.value; if(k==='cuenta') F.cuentaAuto=false; if(k==='prov'){const p=D.proveedores[titleCase(el.value)]; if(p&&!F.cuenta){ /* sugerencia */ }} effects();})});
   const a=document.getElementById('f_adj'); if(a) a.addEventListener('change',()=>{F.adj=a.files.length>0; effects();});
 }
 const titleCase=s=>s.trim().toLowerCase().replace(/\b\p{L}/gu,c=>c.toUpperCase());
@@ -461,6 +461,16 @@ function calc(){
   const t=F.tipo, M=+String(F.monto).replace(/\D/g,'')||0; const o=obras.find(x=>x.id===F.obra);
   const p=D.proveedores[titleCase(F.prov)];
   let cuenta=F.cuenta||(p?p.cuenta:''); let nat=F.cuenta?(['Remuneraciones y honorarios','Teléfono e internet','Vehículo y traslados','Marketing','Patentes y permisos','Otros gastos generales'].includes(F.cuenta)?'Estructura':'Costo directo'):(p?p.nat:'');
+  // «General HH (sin proyecto)» manda: si la cuenta quedó como costo de proyecto porque la sugirió el historial
+  // del proveedor, o porque el proveedor es un gasto fijo conocido (TAG, bencina, seguro auto…), pasa a gasto general.
+  if((t==='pago'||t==='socio')&&!F.obra&&nat==='Costo directo'){
+    const ESTR=['Remuneraciones y honorarios','Teléfono e internet','Vehículo y traslados','Marketing','Patentes y permisos','Otros gastos generales'];
+    const fj=FIJOS.find(f=>!f.noafecta&&ESTR.includes(f.cuenta)&&f.k.some(k=>new RegExp('(^|[^a-z])'+nrm(k)+'([^a-z]|$)').test(' '+nrm(F.prov)+' ')));
+    if(fj||!F.cuenta||F.cuentaAuto){
+      nat='Estructura'; cuenta=fj?fj.cuenta:(ESTR.includes(cuenta)?cuenta:'Otros gastos generales');
+      if(F.cuenta){F.cuenta=cuenta; const sc=document.getElementById('f_cuenta'); if(sc) sc.value=cuenta;}
+    }
+  }
   if((t==='pago'||t==='socio')&&!nat) nat=F.obra?'Costo directo':'Estructura';
   if((t==='pago'||t==='socio')&&nat==='Costo directo'&&!cuenta) cuenta='Materiales';
   if((t==='pago'||t==='socio')&&nat==='Estructura'&&!cuenta) cuenta='Otros gastos generales';
@@ -487,7 +497,7 @@ function effects(){
     rows.push(r(c.nat==='Costo directo'?'Baja el margen de':'Suma a gastos generales',c.nat==='Costo directo'?on:'gastos del mes'));
     rows.push(r('Caja de Happy Home',c.tc?'no se mueve · HH le debe '+clp(c.M)+' a '+(c.t==='socio'?F.socio:'quien pagó'):(F.pagado||c.t==='socio'?'sale ':'queda por pagar ')+clp(c.M)));
     if(c.tc) rows.push(r('Deuda con socio','se crea sola · aparece en Caja y en Socios'));
-    if(c.nat==='Costo directo'&&!F.obra) W.push('<p class="note bad">Un costo directo necesita un proyecto. Elige el proyecto o elige «General HH (sin proyecto)» con una cuenta de gastos generales.</p>');
+    if(c.nat==='Costo directo'&&!F.obra) W.push('<p class="note bad">La cuenta «'+esc(c.cuenta)+'» es costo de proyecto y necesita un proyecto. Si es un gasto general (sin proyecto), cambia la cuenta a una de gastos generales.</p>');
     break;
    case 'cobro': rows.push(r('Venta neta',clp(F.doc==='Factura'?c.neto:c.M)),r('IVA débito (sobre el total facturado)',clp(c.iva)),r('Sube lo pagado por el cliente en',on));
      if(c.com) rows.push(r('Comisión descontada (costo del proyecto)',clp(c.com)),r('Se crean','2 movimientos: cobro '+clp(c.M)+' + comisión '+clp(c.com)));
@@ -610,7 +620,7 @@ function editarMov(id){
   const m=movById(id); if(!m) return; EDIT=id;
   const o=obraDe(m);
   F={...F,socio:/max/i.test(m.quien||'')?'Max':'Rosario',tipo:m.medio==='Cuenta personal socio'&&m.tipo==='egreso'?'socio':(m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso')?'reembsocio':TIPO_DE[m.nat]||(m.cuenta==='Retiro de socio'?'retiro':m.cuenta==='Pago F29 (IVA)'?'f29':m.cuenta==='Cuota de crédito'?'cuota':'traspaso'),prov:m.quien||'',obra:o?o.id:'',doc:['Nada','Factura','Boleta','Boleta de honorarios'].includes(m.doc)?m.doc:'Nada',ret:'hh',edoc:m.estado_doc||'',ndoc:m.ndoc||'',monto:String(m.total),fecha:m.fecha||HOY,cuenta:F.tipo==='pago'?'':'',pagado:m.pagado,llego:'',medio:m.medio||F.medio,detalle:m.detalle||'',liga:m.liga||''};
-  if(['pago','socio'].includes(F.tipo)) F.cuenta=m.cuenta;
+  if(['pago','socio'].includes(F.tipo)){F.cuenta=m.cuenta; F.cuentaAuto=false;}
   irNuevo();
 }
 function devolMov(id){
