@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610141500';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610141500';
+import * as api from './api.js?v=202610141510';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610141510';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -439,7 +439,7 @@ function formHTML(){
   if(t.k==='cuota') h+=`<label>De eso, intereses<input id="f_int" inputmode="numeric" value="${esc(F.interes)}" placeholder="Sale en la cartola del crédito"></label>`;
   if(t.k==='cobro') h+=`<label>Monto pagado por el cliente <small>(lo que llegó; si es menos, la diferencia es comisión)</small><input id="f_llego" inputmode="numeric" value="${esc(F.llego)}" placeholder="Igual al monto"></label>`;
   if(t.k==='reembsocio'){const dd=D.movs.filter(m=>m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso'&&!m.pagado&&m.id!==EDIT); h+=`<label>Qué se le devuelve<select id="f_liga"><option value="">—</option>${dd.map(m=>`<option value="${m.id}" ${F.liga===m.id?'selected':''}>${esc(m.quien)} ${clp(m.total)} · ${esc((m.detalle||'').slice(0,50))}</option>`).join('')}</select></label>`;}
-  if(['pago','cobro','reemb'].includes(t.k)) h+=`<label>Estado<select id="f_pag"><option value="1" ${F.pagado?'selected':''}>Pagado</option><option value="0" ${!F.pagado?'selected':''}>Pendiente de pago</option></select></label>`;
+  if(['pago','cobro','reemb','f29'].includes(t.k)) h+=`<label>Estado<select id="f_pag"><option value="1" ${F.pagado?'selected':''}>Pagado</option><option value="0" ${!F.pagado?'selected':''}>Pendiente de pago</option></select></label>`;
   if(t.k!=='nopago'&&t.k!=='socio') h+=`<label>${t.k==='cobro'||t.k==='reemb'||t.k==='devol'?'Entra a':'Pagado con'}<select id="f_medio">${MEDIOS.map(m=>`<option ${F.medio===m?'selected':''}>${m}</option>`).join('')}</select></label>`;
   h+=`<label>Fecha<input id="f_fecha" type="date" value="${F.fecha}"></label><label>Detalle<input id="f_det" value="${esc(F.detalle)}" placeholder="Opcional"></label>`;
   h+=`<label>Respaldo (foto o PDF)<input id="f_adj" type="file" accept="image/*,application/pdf"></label>`;
@@ -525,7 +525,7 @@ async function guardar(c,t){
   try{
   const ing=['cobro','reemb','devol'].includes(F.tipo);
   const [nat,cuenta]=NAT_T[F.tipo]||[c.nat,c.cuenta];
-  const pag=['pago','cobro','reemb'].includes(F.tipo)?F.pagado:(F.tipo!=='socio');
+  const pag=['pago','cobro','reemb','f29'].includes(F.tipo)?F.pagado:(F.tipo!=='socio');
   const unO=c.o?c.o.un:null;
   const medio=F.tipo==='socio'?'Cuenta personal socio':(F.tipo==='nopago'?null:F.medio);
   const base={fecha:F.fecha||null,tipo:ing?'ingreso':'egreso',quien:(F.prov||(F.tipo==='retiro'||F.tipo==='reembsocio'||F.tipo==='socio'?F.socio:t.t)).trim(),total:c.M,neto:F.tipo==='nopago'?c.neto:(['pago','cobro','socio'].includes(F.tipo)?c.neto:c.M),iva:F.tipo==='nopago'?0:c.iva,doc:t.doc?F.doc:'Nada',ndoc:F.ndoc||null,pagado:F.tipo==='socio'?true:pag,detalle:F.detalle||null,estado_doc:t.doc?(F.edoc||(F.doc==='Nada'?'no_aplica':'ok')):'no_aplica',nat,cuenta,un:['Venta','Costo directo','Recupero','Pérdida'].includes(nat)?unO:null,obra_id:c.o?c.o.id:null,medio,liga:F.liga||null};
@@ -542,7 +542,7 @@ async function guardar(c,t){
     if(F.tipo!=='socio') await api.actualizar('movimientos',id,{pagado:true});
     nuevos.push({fecha:base.fecha,tipo:'egreso',quien:soc,total:c.M,neto:c.M,iva:0,doc:'Nada',pagado:false,detalle:'Devolver a '+soc+' lo que pagó a '+(base.quien||'—')+' ('+id+')',nat:'No afecta',cuenta:'Traspaso / pagado por socios',liga:id}); extra.push('deuda con '+soc);}
   if(c.ret&&!EDIT) nuevos.push({fecha:base.fecha,tipo:'egreso',quien:'SII · retención honorarios',total:c.ret,neto:c.ret,iva:0,doc:'Nada',pagado:false,detalle:'Retención 15,25% de la boleta de '+base.quien+(base.ndoc?' N° '+base.ndoc:'')+' ('+id+'). Se paga en el F29.',nat:base.nat,cuenta:base.cuenta,un:base.un,obra_id:base.obra_id,liga:id});
-  if(F.tipo==='f29'&&!EDIT){const rets=D.movs.filter(m=>!m.pagado&&m.quien==='SII · retención honorarios'&&(m.fecha||'')<base.fecha); for(const m of rets) await api.actualizar('movimientos',m.id,{pagado:true,medio:'Pagado en el F29',detalle:(m.detalle||'')+' · pagada con '+id}); if(rets.length) extra.push(rets.length+' retención(es) de honorarios marcadas como pagadas');}
+  if(F.tipo==='f29'&&!EDIT&&pag){const rets=D.movs.filter(m=>!m.pagado&&m.quien==='SII · retención honorarios'&&(m.fecha||'')<base.fecha); for(const m of rets) await api.actualizar('movimientos',m.id,{pagado:true,medio:'Pagado en el F29',detalle:(m.detalle||'')+' · pagada con '+id}); if(rets.length) extra.push(rets.length+' retención(es) de honorarios marcadas como pagadas');}
   if(nuevos.length) await api.insertar('movimientos',nuevos);
   if(F.tipo==='reembsocio'&&F.liga&&!EDIT){await api.actualizar('movimientos',F.liga,{pagado:true,fecha:base.fecha,detalle:((movById(F.liga)||{}).detalle||'')+' · devuelto con '+id}); extra.push(F.liga+' saldado');}
   toast((EDIT?'Corregido ':'Guardado ')+id+(extra.length?' + '+extra.join(', '):''));
@@ -606,6 +606,8 @@ function movDlg(id){
 async function marcarPagado(id){
   const m=movById(id); const f=$('#mp_f').value; const medio=$('#mp_c').value;
   try{ await api.actualizar('movimientos',id,{pagado:true,fecha:f,medio});
+    // F29 que estaba pendiente: al pagarlo se dan por pagadas las retenciones de honorarios anteriores (igual que al registrarlo pagado)
+    if(m&&m.cuenta==='Pago F29 (IVA)'){const rets=D.movs.filter(x=>!x.pagado&&x.quien==='SII · retención honorarios'&&(x.fecha||'')<f); for(const x of rets) await api.actualizar('movimientos',x.id,{pagado:true,medio:'Pagado en el F29',detalle:(x.detalle||'')+' · pagada con '+id});}
     await refrescar(); toast('Marcado como pagado. Plata libre: '+clp(libre));
   }catch(e){toast('No se pudo: '+(e.message||e));}
 }
