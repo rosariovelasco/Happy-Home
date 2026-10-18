@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610182046';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610182046';
+import * as api from './api.js?v=202610182050';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610182050';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -416,11 +416,10 @@ V.fijos=()=>{
   const faltan=activos.filter(r=>!r.f.impuesto&&!(r.por[mesAct]>0));
   return `<div>${backBtn}<h1>Gastos fijos</h1><p class="sub">Los pagos que se repiten todos los meses. La app los reconoce por palabra clave en el nombre o el detalle del movimiento.</p></div>
   <section class="card"><div class="grid g4">
-   <div class="kpi"><span>1. Gastos fijos de la empresa <i class="tg ci">con IVA</i></span><b>${clp(empMes)}</b><small>se repiten todos los meses: contador, Previred, teléfono, bencina, TAG, seguro, banco (la lista de abajo)</small></div>
-   <div class="kpi"><span>2. Otros gastos de la empresa <i class="tg ci">con IVA</i></span><b>${clp(otrosMes)}</b><small>no se repiten: compras, honorarios extra, web, ads… (promedio de ${msC.length} meses)</small></div>
-   <div class="kpi"><span>3. Cuota del crédito <i class="tg ci">con IVA</i></span><b>${clp(credMes)}</b><small>${esc(activos.filter(r=>grp(r)==='cred').map(r=>r.f.n).join(', ')||'ninguna')}: pago de deuda</small></div>
-   <div class="kpi" style="border:2px solid var(--line-strong,#999)"><span><b style="font-size:inherit">Total que sale al mes (1+2+3)</b></span><b class="negc">${clp(totalMes)}</b><small>lo que HH necesita ganar cada mes para no perder plata, sin contar retiros ni el F29</small></div>
-  </div></section>
+   <div class="kpi"><span>Gastos fijos de la empresa <i class="tg ci">con IVA</i></span><b>${clp(empMes)}</b><small>todos los meses: contador, Previred, teléfono, bencina, TAG, seguro, banco (la lista de abajo)</small></div>
+   <div class="kpi"><span>Cuota del crédito <i class="tg ci">con IVA</i></span><b>${clp(credMes)}</b><small>${esc(activos.filter(r=>grp(r)==='cred').map(r=>r.f.n).join(', ')||'ninguna')}: pago de deuda</small></div>
+   <div class="kpi" style="border:2px solid var(--line-strong,#999)"><span><b style="font-size:inherit">Sale todos los meses</b></span><b class="negc">${clp(empMes+credMes)}</b><small>fijos + cuota, sin retiros ni F29</small></div>
+   <div class="kpi"><span>Además, gastos puntuales <i class="tg ci">con IVA</i></span><b>${clp(Math.round(otrosMes*msC.length))}</b><small>en ${msC.length} meses (~${clp(otrosMes)} al mes): reparaciones, renta anual, aguinaldo, imposiciones atrasadas, web, materiales sin proyecto… No se repiten, pero cada mes aparece alguno</small></div>  </div></section>
   <section class="card"><div class="grid g4">
    <div class="kpi"><span>Pagado este mes (${MESL[+mesAct.slice(5)-1]})</span><b>${clp(pagadoMes)}</b></div>
    <div class="kpi"><span>Faltan este mes</span><b class="${faltan.length?'negc':''}">${faltan.length}</b><small>${esc(faltan.map(r=>r.f.n).join(', ')||'nada')}</small></div>
