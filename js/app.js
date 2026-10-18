@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610181948';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181948';
+import * as api from './api.js?v=202610181952';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181952';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -157,9 +157,9 @@ V.inicio=()=>{
     <button type="button" class="kpi kbtn" data-k="cobrar"><span>Por cobrar a clientes <i class="tg ci">con IVA</i></span><b>${clp(porCobrar)}</b><small>con IVA · lo que todavía deben pagar</small><small class="ver">Ver detalle →</small></button>
   </div></section>
   <div class="grid g2">
-    <section class="card"><h2>Proyectos en curso</h2><div class="tbl"><table><thead><tr><th>Proyecto</th><th class="n">Queda para terminar <i class="tg ci">con IVA</i></th><th class="n">Falta que pague el cliente <i class="tg ci">con IVA</i></th></tr></thead><tbody>
+    <section class="card"><h2>Proyectos en curso</h2><div class="tbl"><table><thead><tr><th>Proyecto</th><th class="n">Máximo para terminar <i class="tg ci">con IVA</i></th><th class="n">Falta que pague el cliente <i class="tg ci">con IVA</i></th></tr></thead><tbody>
     ${open.map(o=>{const q=o.costo_est?Math.round((o.costo_est-o.costo_real)*1.19):null; return `<tr class="click" data-obra="${o.id}"><td>${esc(o.nombre)}<br><span class="chip ${o.un}">${o.un}</span></td><td class="n ${q!=null&&q<0?'negc':''}">${q==null?'—':clp(q)}</td><td class="n">${clp(o.por_cobrar)}</td></tr>`;}).join('')}
-    <tr><td colspan="3"><small class="sub">Con IVA. "Queda para terminar" = costo estimado − costo anotado: lo que se puede seguir gastando sin comerse la ganancia.</small></td></tr>
+    <tr><td colspan="3"><small class="sub">Con IVA. "Máximo para terminar" = costo presupuestado − lo ya gastado: lo máximo que se puede gastar para terminar sin perder ganancia. Si se gasta más, cada peso extra sale del margen.</small></td></tr>
     </tbody></table></div></section>
     <section class="card"><h2>Requiere atención</h2><ul class="alerts">${alerts.join('')||'<li>Nada pendiente.</li>'}</ul></section>
   </div>`;
@@ -178,7 +178,7 @@ V.obras=()=>{
     <button type="button" class="kpi kbtn" data-fobr="cerrada"><span>Margen HH · proyectos cerrados desde enero <i class="tg si">sin IVA</i></span><b>${clp(sm(C_,'margen'))}</b><small>sin IVA · ${C_.length} proyectos · <strong>antes de CC</strong>. De eso, CC se lleva ${clp(sm(C_,'cc_parte'))} y a HH le quedan ${clp(sm(C_,'margen_hh'))}</small></button>
     <button type="button" class="kpi kbtn" data-fobr="abierta"><span>Margen HH real proyectado · en curso <i class="tg si">sin IVA</i></span><b>${clp(sm(A_,'margen'))}</b><small>sin IVA · ${A_.length} proyectos · <strong>antes de CC</strong> · presupuestado: ${clp(sm(A_,'margen_pres'))}.<br> De eso, CC se lleva ${clp(sm(A_,'cc_parte'))} y a HH le quedan ${clp(sm(A_,'margen_hh'))}</small></button>
     </div></section>`;})()}
-  <section class="card"><label style="margin-bottom:10px">Buscar proyecto<input id="fob" value="${esc(fob)}" placeholder="Nombre, cliente o código (busca también en proyectos antiguos)"></label><div class="spread" style="margin-bottom:10px"><div class="seg">${[['','Todos'],['abierta','En curso'],['cerrada','Cerrados'],['cuadrar','Por cuadrar']].map(([k,t])=>`<button type="button" data-fobr="${k}" aria-pressed="${fobr===k}">${t} <small>${obras.filter(o=>!k||(k==='abierta'?o.abierta:k==='cerrada'?(!o.abierta&&!noCuadrada(o)):(!o.abierta&&noCuadrada(o)))).length}</small></button>`).join('')}</div><div class="row solo-ros"><button class="btn" type="button" data-act="obra-new">+ Nuevo proyecto</button><button class="btn ghost" type="button" data-go="cotizar">Desde cotización</button></div></div><div class="tbl"><table><thead><tr><th>Proyecto</th><th>Unidad</th><th>Estado</th><th class="n">Presupuesto neto</th><th class="n">Costo directo</th><th class="n" title="presupuesto − costo presupuestado">Margen presupuestado</th><th class="n" title="cerrados: lo que se ganó · en curso: lo que se va a ganar según el gasto">Margen real</th><th class="n">%</th><th class="n">Queda para HH</th><th class="n">Queda para gastar <small>(con IVA)</small></th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  <section class="card"><label style="margin-bottom:10px">Buscar proyecto<input id="fob" value="${esc(fob)}" placeholder="Nombre, cliente o código (busca también en proyectos antiguos)"></label><div class="spread" style="margin-bottom:10px"><div class="seg">${[['','Todos'],['abierta','En curso'],['cerrada','Cerrados'],['cuadrar','Por cuadrar']].map(([k,t])=>`<button type="button" data-fobr="${k}" aria-pressed="${fobr===k}">${t} <small>${obras.filter(o=>!k||(k==='abierta'?o.abierta:k==='cerrada'?(!o.abierta&&!noCuadrada(o)):(!o.abierta&&noCuadrada(o)))).length}</small></button>`).join('')}</div><div class="row solo-ros"><button class="btn" type="button" data-act="obra-new">+ Nuevo proyecto</button><button class="btn ghost" type="button" data-go="cotizar">Desde cotización</button></div></div><div class="tbl"><table><thead><tr><th>Proyecto</th><th>Unidad</th><th>Estado</th><th class="n">Presupuesto neto</th><th class="n">Costo directo</th><th class="n" title="presupuesto − costo presupuestado">Margen presupuestado</th><th class="n" title="cerrados: lo que se ganó · en curso: lo que se va a ganar según el gasto">Margen real</th><th class="n">%</th><th class="n">Queda para HH</th><th class="n">Máximo para terminar <small>(con IVA)</small></th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 };
 function ficha(id){
   const o=obrasAll.find(x=>x.id===id); if(!o) return; FICHA=id;
@@ -203,7 +203,7 @@ function ficha(id){
     const fila=(t,a,b,c,sub)=>`<tr><td>${t}${sub?`<br><small class="sub" style="margin:0">${sub}</small>`:''}</td>${td(a)}${td(b)}${td(c)}${td(b+c)}</tr>`;
     return `<div><h3>Presupuestado vs real a la fecha <i class="tg si">sin IVA</i></h3><div class="tbl"><table class="pl"><thead><tr><th></th><th class="n">Presupuestado</th><th class="n">Real a la fecha</th><th class="n">Lo que falta</th><th class="n" title="real a la fecha + lo que falta">Final proyectado</th></tr></thead><tbody>
     ${fila('Venta (cliente)',o.pres_neto,vR,vF,`falta que pague el cliente: ${clp(Math.round(vF*1.19))} con IVA`)}
-    ${fila('− Costo de la obra',-o.costo_est,-cR,-cF,`queda para gastar: ${clp(Math.round(cF*1.19))} con IVA${o.costo_proy?' (según lo que dijo la obra)':' (si se termina dentro del presupuesto)'}`)}
+    ${fila('− Costo de la obra',-o.costo_est,-cR,-cF,`máximo para terminar: ${clp(Math.round(cF*1.19))} con IVA${o.costo_proy?' (según lo que dijo la obra)':' sin perder ganancia'}`)}
     ${fila('<b>= Margen del proyecto</b>',o.margen_pres,mR,mF,'')}
     ${cc?fila('− Parte de Casa Construcción (50%)',-ccT,-ccR,-ccF,`real a la fecha = lo ya pagado a CC · falta pagarle ${clp(Math.round(ccF*1.19))} con IVA`):''}
     ${fila('<b>= Para HH</b>',o.margen_pres-ccT,hhR,hhF,'real a la fecha = margen que ya entró en caja y HH ya tiene o usó'+(r.repHH?` (incluye ${clp(r.repHH)} de retiros de socio cargados a este proyecto)`:''))}
@@ -211,11 +211,11 @@ function ficha(id){
   <div><h3>Cobro al cliente</h3><div class="bar"><i style="width:${cob}%"></i></div><div class="spread"><small class="num">${clp(o.cobrado_total)} pagado por el cliente</small><small class="num">${o.abierta?clp(o.por_cobrar)+' por cobrar':''}</small></div></div>
   ${o.abierta?(()=>{const tope=o.costo_est||0; const pend=sum(D.movs.filter(m=>m.obra_id===o.id&&!m.pagado&&m.nat==='Costo directo').map(m=>m.neto)); const disp=tope-o.costo_real; const r=repartoObra(o);
     if(!tope) return `<div class="note">Este proyecto no tiene costo estimado, así que no se puede calcular cuánto queda para gastar. Ponlo en <b>Editar datos del proyecto</b> (o el margen que quieren ganar).</div>`;
-    return `<div><h3>¿Cuánto queda para gastar?</h3><div class="grid g2"><div class="tbl"><table><tbody>
+    return `<div><h3>¿Cuánto se puede gastar para terminar?</h3><div class="grid g2"><div class="tbl"><table><tbody>
      <tr><td>Tope de gasto <small>(costo presupuestado)</small></td><td class="n">${clp(tope*1.19)}<br><small>${clp(tope)} neto</small></td></tr>
-     <tr><td>− Costo anotado <small>(pagado + por pagar${pend?'; por pagar '+clp(Math.round(pend*1.19)):''})</small></td><td class="n">${clp(-o.costo_real*1.19)}<br><small>${clp(-o.costo_real)} neto</small></td></tr>
-     <tr class="tot"><td>= Queda para terminar el proyecto</td><td class="n ${disp<0?'negc':'pos'}" style="font-size:15px">${clp(disp*1.19)}<br><small>${clp(disp)} neto</small></td></tr>
-     <tr><td colspan="2"><small>Con IVA, como si todo se comprara con factura (ese IVA se recupera en el F29). Es lo que se le puede decir a CC que tiene para terminar. Ganancia que queremos: ${pct(o.pres_neto?(o.pres_neto-tope)/o.pres_neto*100:0)} (${clp(o.pres_neto-tope)} neto sobre un presupuesto de ${clp(o.pres_neto)} neto).</small></td></tr>
+     <tr><td>− Ya gastado <small>(pagado + por pagar${pend?'; por pagar '+clp(Math.round(pend*1.19)):''})</small></td><td class="n">${clp(-o.costo_real*1.19)}<br><small>${clp(-o.costo_real)} neto</small></td></tr>
+     <tr class="tot"><td>= Máximo que se puede gastar para terminar<br><small>sin perder ganancia; cada peso extra sale del margen</small></td><td class="n ${disp<0?'negc':'pos'}" style="font-size:15px">${clp(disp*1.19)}<br><small>${clp(disp)} neto</small></td></tr>
+     <tr><td colspan="2"><small>Con IVA, como si todo se comprara con factura (ese IVA se recupera en el F29). Es lo que se le dice a CC que tiene como tope para terminar. Ganancia que queremos: ${pct(o.pres_neto?(o.pres_neto-tope)/o.pres_neto*100:0)} (${clp(o.pres_neto-tope)} neto sobre un presupuesto de ${clp(o.pres_neto)} neto).</small></td></tr>
     </tbody></table></div>
     <div class="effect">
      <div><span>Plata del proyecto hoy <small>(neto · pagado por el cliente − gastado − repartido)</small></span><b class="num ${r.cajaObra<0?'negc':''}">${clp(r.cajaObra)}</b></div>
@@ -880,7 +880,7 @@ V.reparto=()=>{
   ${L.map(x=>`<section class="card"><div class="spread"><h2>${esc(x.o.nombre)}</h2><span class="chip ${x.o.un}">${x.o.un}</span></div>
    <div class="grid g2"><div class="tbl"><table><tbody>
     ${fila('Pagado por el cliente (sin IVA)',clp(x.cobrado))}
-    ${fila('− Costo anotado',clp(-x.gastado))}
+    ${fila('− Ya gastado',clp(-x.gastado))}
     ${fila('− Ya repartido a CC (sin IVA)',clp(-x.repCC))}
     ${fila('− Ya retirado por HH',clp(-x.repHH))}
     <tr class="tot"><td>= Plata del proyecto sin repartir</td><td class="n">${clp(x.cajaObra)}</td></tr>
