@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610181935';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181935';
+import * as api from './api.js?v=202610181948';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181948';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -196,11 +196,23 @@ function ficha(id){
    ${cc?`<div class="kpi"><span>Margen HH <i class="tg si">sin IVA</i></span><b>${clp(o.margen-o.cc_parte)}</b><small>margen del proyecto − parte de Casa Construcción</small></div>`:`<div class="kpi"><span>Pagado por el cliente <i class="tg ci">con IVA</i></span><b>${clp(o.cobrado_total)}</b><small>con IVA</small></div>`}
   </div>
   ${noCuadrada(o)?`<p class="note bad"><b>No cuadra:</b> faltan ${clp(o.descuadre)} netos entre el presupuesto y lo pagado por el cliente. Para cerrarlo hay que registrar el pago que falta o declararlo como "monto no pagado por el cliente".</p>`:''}
+  ${o.abierta&&o.costo_est&&o.pres_neto?(()=>{const r=repartoObra(o); const ccT=cc?Math.round(o.margen_pres/2):0;
+    const vR=o.cobrado_neto, cR=o.costo_real, mR=vR-cR, ccR=o.cc_pagado||0, hhR=mR-ccR;
+    const vF=r.faltaCobrar, cF=r.faltaGastar, mF=vF-cF, mFin=mR+mF, ccFin=cc?Math.round(mFin/2):0, ccF=ccFin-ccR, hhF=mF-ccF;
+    const td=(v)=>`<td class="n ${v<0?'negc':''}">${clp(v)}</td>`;
+    const fila=(t,a,b,c,sub)=>`<tr><td>${t}${sub?`<br><small class="sub" style="margin:0">${sub}</small>`:''}</td>${td(a)}${td(b)}${td(c)}${td(b+c)}</tr>`;
+    return `<div><h3>Presupuestado vs real a la fecha <i class="tg si">sin IVA</i></h3><div class="tbl"><table class="pl"><thead><tr><th></th><th class="n">Presupuestado</th><th class="n">Real a la fecha</th><th class="n">Lo que falta</th><th class="n" title="real a la fecha + lo que falta">Final proyectado</th></tr></thead><tbody>
+    ${fila('Venta (cliente)',o.pres_neto,vR,vF,`falta que pague el cliente: ${clp(Math.round(vF*1.19))} con IVA`)}
+    ${fila('− Costo de la obra',-o.costo_est,-cR,-cF,`queda para gastar: ${clp(Math.round(cF*1.19))} con IVA${o.costo_proy?' (según lo que dijo la obra)':' (si se termina dentro del presupuesto)'}`)}
+    ${fila('<b>= Margen del proyecto</b>',o.margen_pres,mR,mF,'')}
+    ${cc?fila('− Parte de Casa Construcción (50%)',-ccT,-ccR,-ccF,`real a la fecha = lo ya pagado a CC · falta pagarle ${clp(Math.round(ccF*1.19))} con IVA`):''}
+    ${fila('<b>= Para HH</b>',o.margen_pres-ccT,hhR,hhF,'real a la fecha = margen que ya entró en caja y HH ya tiene o usó'+(r.repHH?` (incluye ${clp(r.repHH)} de retiros de socio cargados a este proyecto)`:''))}
+    </tbody></table></div>${hhF<0?`<p class="note bad">HH ya usó ${clp(-hhF)} más de lo que le corresponde en este proyecto: lo que falta cobrar no alcanza para terminar y pagarle a CC.</p>`:''}</div>`;})():''}
   <div><h3>Cobro al cliente</h3><div class="bar"><i style="width:${cob}%"></i></div><div class="spread"><small class="num">${clp(o.cobrado_total)} pagado por el cliente</small><small class="num">${o.abierta?clp(o.por_cobrar)+' por cobrar':''}</small></div></div>
   ${o.abierta?(()=>{const tope=o.costo_est||0; const pend=sum(D.movs.filter(m=>m.obra_id===o.id&&!m.pagado&&m.nat==='Costo directo').map(m=>m.neto)); const disp=tope-o.costo_real; const r=repartoObra(o);
     if(!tope) return `<div class="note">Este proyecto no tiene costo estimado, así que no se puede calcular cuánto queda para gastar. Ponlo en <b>Editar datos del proyecto</b> (o el margen que quieren ganar).</div>`;
     return `<div><h3>¿Cuánto queda para gastar?</h3><div class="grid g2"><div class="tbl"><table><tbody>
-     <tr><td>Tope de gasto <small>(costo estimado del presupuesto)</small></td><td class="n">${clp(tope*1.19)}<br><small>${clp(tope)} neto</small></td></tr>
+     <tr><td>Tope de gasto <small>(costo presupuestado)</small></td><td class="n">${clp(tope*1.19)}<br><small>${clp(tope)} neto</small></td></tr>
      <tr><td>− Costo anotado <small>(pagado + por pagar${pend?'; por pagar '+clp(Math.round(pend*1.19)):''})</small></td><td class="n">${clp(-o.costo_real*1.19)}<br><small>${clp(-o.costo_real)} neto</small></td></tr>
      <tr class="tot"><td>= Queda para terminar el proyecto</td><td class="n ${disp<0?'negc':'pos'}" style="font-size:15px">${clp(disp*1.19)}<br><small>${clp(disp)} neto</small></td></tr>
      <tr><td colspan="2"><small>Con IVA, como si todo se comprara con factura (ese IVA se recupera en el F29). Es lo que se le puede decir a CC que tiene para terminar. Ganancia que queremos: ${pct(o.pres_neto?(o.pres_neto-tope)/o.pres_neto*100:0)} (${clp(o.pres_neto-tope)} neto sobre un presupuesto de ${clp(o.pres_neto)} neto).</small></td></tr>
