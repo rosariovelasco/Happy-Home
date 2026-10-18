@@ -35,7 +35,8 @@ export function calcObras(obrasDB, movs) {
     let base_ing, costo_final, margen;
     if (abierta) {
       base_ing = +o.pres_neto;
-      costo_final = +o.costo_est ? Math.max(+o.costo_est, costoN) : costoN;
+      const proy = +o.costo_proy || 0;
+      costo_final = proy ? Math.max(proy, costoN) : (+o.costo_est ? Math.max(+o.costo_est, costoN) : costoN);
       margen = base_ing - costo_final - perdida;
     } else {
       base_ing = cobrado_neto + Math.round(por_cobrar_mov / 1.19);
@@ -49,6 +50,9 @@ export function calcObras(obrasDB, movs) {
       cobrado_neto: r0(cobrado_neto), cobrado_total: r0(cobrado_total),
       por_cobrar: abierta ? r0(Math.max(0, o.pres_total - cobrado_total)) : r0(por_cobrar_mov),
       costo_real: r0(costoN), costo_final: r0(costo_final), perdida: r0(perdida), margen: r0(margen),
+      margen_pres: +o.costo_est && +o.pres_neto ? r0(o.pres_neto - o.costo_est) : null,
+      margen_pres_pct: +o.costo_est && +o.pres_neto ? Math.round((o.pres_neto - o.costo_est) / o.pres_neto * 1000) / 10 : null,
+      costo_proy: +o.costo_proy || null,
       margen_pct: base_ing ? Math.round(margen / base_ing * 1000) / 10 : 0,
       cc_parte: cc, cc_pagado: r0(part_cc), cc_pagado_total: r0(part_cc_total), costo_con_iva: r0(costo_bruto - recupero_bruto), margen_hh: r0(margen - cc), por_pagar: r0(por_pagar),
       cuentas: Object.fromEntries(Object.entries(cuentas).map(([k, v]) => [k, r0(v)]).sort((a, b) => b[1] - a[1])),
