@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610181848';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181848';
+import * as api from './api.js?v=202610181854';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181854';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -471,6 +471,8 @@ function calc(){
       if(F.cuenta){F.cuenta=cuenta; const sc=document.getElementById('f_cuenta'); if(sc) sc.value=cuenta;}
     }
   }
+  // una cuota de crédito conocida (crédito auto, Fogape) nunca es gasto general: es devolver un préstamo
+  if((t==='pago'||t==='socio')&&FIJOS.some(f=>f.noafecta&&f.cuenta==='Cuota de crédito'&&f.k.some(k=>new RegExp('(^|[^a-z])'+nrm(k)+'([^a-z]|$)').test(' '+nrm(F.prov+' '+(F.detalle||''))+' ')))){nat='No afecta'; cuenta='Cuota de crédito';}
   if((t==='pago'||t==='socio')&&!nat) nat=F.obra?'Costo directo':'Estructura';
   if((t==='pago'||t==='socio')&&nat==='Costo directo'&&!cuenta) cuenta='Materiales';
   if((t==='pago'||t==='socio')&&nat==='Estructura'&&!cuenta) cuenta='Otros gastos generales';
