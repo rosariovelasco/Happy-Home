@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610181912';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181912';
+import * as api from './api.js?v=202610181915';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181915';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -134,7 +134,7 @@ V.inicio=()=>{
   const alarma=(SA.hoyo>0||libre<0)?`<section class="alarma"><div class="al-t">⚠ ${SA.hoyo>0?`Hay un hoyo de ${clp(SA.hoyo)}`:'No hay plata libre'}</div>
    <div class="al-g">
     ${SA.hoyo>0?`<div><span>Desde enero HH ganó <i class="tg si">sin IVA</i></span><b>${clp(SA.generado)}</b><small>margen HH − gastos generales (sin IVA)</small></div><div><span>Retiros de Max <i class="tg ci">con IVA</i></span><b class="negc">${clp(SA.retirado)}</b><small>${clp(Math.round(SA.retirado/SA.nm))} al mes${SA.deRos?' · incluye '+clp(SA.deRos)+' de Rosario':''}</small></div><div><span>Se sacó de más <i class="tg si">sin IVA</i></span><b class="negc">−${clp(SA.hoyo)}</b><small>salió de la plata que se le debe a CC</small></div>`:''}
-    <div><span>Lo que viene, por mes <i class="tg si">sin IVA</i></span><b class="${SA.deficit<0?'negc':'pos'}">${SA.deficit<0?'−':'+'}${clp(Math.abs(SA.deficit))}</b><small>aseos ${clp(SA.aseoMes)} − gastos generales ${clp(SA.ggMes)} − cuota crédito ${clp(SA.cuota)}</small></div>
+    <div><span>Si no entran proyectos nuevos, cada mes HH ${SA.deficit<0?'pierde':'gana'}</span><b class="${SA.deficit<0?'negc':'pos'}">${clp(Math.abs(SA.deficit))}</b><small>entra: margen de los aseos ${clp(SA.aseoMes)} · sale: gastos generales ${clp(SA.ggMes)} + cuota del auto ${clp(SA.cuota)}</small></div>
     <div><span>Proyectos en curso, hasta terminar <i class="tg si">sin IVA</i></span><b class="${SA.unaVez<0?'negc':''}">${SA.unaVez<0?'−':'+'}${clp(Math.abs(SA.unaVez))}</b><small>para HH, una sola vez${SA.unaVez<0?': su margen ya entró y se usó':''}</small></div>
    </div>
    <p>${SA.deficit<0?`<b>Sin proyectos nuevos, el hoyo crece ~${clp(-SA.deficit)} al mes.</b> Para no seguir cayendo hay que vender ~${clp(-SA.deficit)} de margen HH al mes. `:''}${SA.hoyo>0?'<b>No hacer retiros</b> hasta cerrar el hoyo. ':''}Primero se pagan las facturas de costos de las obras y las obligaciones (Previred, crédito, impuestos); la participación de CC, a medida que paguen los clientes. <a href="#" data-go="reparto">Ver reparto →</a> · <a href="#" data-go="plata">¿Dónde se fue la plata? →</a></p></section>`:'';
