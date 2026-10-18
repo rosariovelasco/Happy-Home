@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610182019';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610182019';
+import * as api from './api.js?v=202610182042';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610182042';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -408,18 +408,23 @@ V.fijos=()=>{
     if(mm===mesAct) return `<td class="n"><span class="chip warn">pendiente</span></td>`;
     return `<td class="n">${r.tipico?'<span class="chip bad">no pagado</span>':'—'}</td>`;};
   const activos=tab.filter(r=>r.tipico>0&&!r.terminado);
+  const grp=r=>r.f.impuesto?'imp':r.f.cuenta==='Cuota de crédito'?'cred':'emp';
   const pagadoMes=sum(activos.map(r=>r.por[mesAct]||0)), esperadoMes=sum(activos.filter(r=>!r.f.impuesto).map(r=>r.tipico));
+  const empMes=sum(activos.filter(r=>grp(r)==='emp').map(r=>r.tipico)), credMes=sum(activos.filter(r=>grp(r)==='cred').map(r=>r.tipico));
   const faltan=activos.filter(r=>!r.f.impuesto&&!(r.por[mesAct]>0));
   return `<div>${backBtn}<h1>Gastos fijos</h1><p class="sub">Los pagos que se repiten todos los meses. La app los reconoce por palabra clave en el nombre o el detalle del movimiento.</p></div>
   <section class="card"><div class="grid g4">
-   <div class="kpi"><span>Fijos de un mes normal</span><b>${clp(esperadoMes)}</b><small>sin contar el F29</small></div>
+   <div class="kpi"><span>Gastos fijos de la empresa <i class="tg ci">con IVA</i></span><b>${clp(empMes)}</b><small>al mes · contador, Previred, teléfono, bencina, TAG, seguro, banco…</small></div>
+   <div class="kpi"><span>Cuotas de créditos <i class="tg ci">con IVA</i></span><b>${clp(credMes)}</b><small>al mes · ${esc(activos.filter(r=>grp(r)==='cred').map(r=>r.f.n).join(', ')||'ninguna')}. No es gasto: es pagar una deuda</small></div>
+   <div class="kpi"><span>Total que sale al mes</span><b>${clp(esperadoMes)}</b><small>empresa + cuotas, sin el F29 (IVA)</small></div>
    <div class="kpi"><span>Pagado este mes (${MESL[+mesAct.slice(5)-1]})</span><b>${clp(pagadoMes)}</b></div>
    <div class="kpi"><span>Faltan este mes</span><b class="${faltan.length?'negc':''}">${faltan.length}</b><small>${esc(faltan.map(r=>r.f.n).join(', ')||'nada')}</small></div>
   </div></section>
   <section class="card"><div class="tbl"><table><thead><tr><th>Gasto fijo</th><th class="n">Monto habitual</th>${ms.map(mm=>`<th class="n">${MES[+mm.slice(5)-1]}</th>`).join('')}<th class="solo-ros"></th></tr></thead><tbody>
-   ${tab.map(r=>`<tr><td><b>${esc(r.f.n)}</b>${r.terminado?' <span class="chip">sin pagos hace 3 meses</span>':''}<br><small class="sub">${esc(r.f.cuenta)}${r.f.noafecta?' · no afecta resultado':''}</small></td><td class="n">${r.tipico?clp(r.tipico):'—'}</td>${ms.map((mm,i)=>celda(r,mm,i)).join('')}<td class="solo-ros">${r.tipico&&!r.terminado&&!(r.por[mesAct]>0)?`<button class="x" type="button" data-act="fijo-reg" data-id="${FIJOS.indexOf(r.f)}">Registrar</button>`:''}</td></tr>`).join('')}
+   ${[['emp','Gastos de la empresa'],['cred','Cuotas de créditos (deuda, no gasto)'],['imp','Impuestos']].map(([g,t])=>{const L=tab.filter(r=>grp(r)===g); if(!L.length) return ''; const st=sum(L.filter(r=>!r.terminado).map(r=>r.tipico));
+     return `<tr class="tot"><td colspan="2"><b>${t}</b>${g!=='imp'?` · <span class="num">${clp(st)}</span> al mes`:''}</td><td colspan="${ms.length+1}"></td></tr>`+L.map(r=>`<tr><td><b>${esc(r.f.n)}</b>${r.terminado?' <span class="chip">sin pagos hace 3 meses</span>':''}<br><small class="sub">${esc(r.f.cuenta)}${r.f.noafecta?' · no afecta resultado':''}</small></td><td class="n">${r.tipico?clp(r.tipico):'—'}</td>${ms.map((mm,i)=>celda(r,mm,i)).join('')}<td class="solo-ros">${r.tipico&&!r.terminado&&!(r.por[mesAct]>0)?`<button class="x" type="button" data-act="fijo-reg" data-id="${FIJOS.indexOf(r.f)}">Registrar</button>`:''}</td></tr>`).join('');}).join('')}
   </tbody></table></div>
-  <p class="help">"2 meses": se pagaron dos meses juntos. "Junto con el siguiente": ese mes no se pagó porque se pagó con el mes siguiente. El monto habitual es el valor típico de los meses anteriores. Si un gasto lleva 3 meses sin pagos se marca como terminado (ej. un crédito que se terminó de pagar) y deja de contarse.</p></section>`;
+  <p class="help">Esta pantalla muestra solo los pagos que se repiten todos los meses. Los gastos generales totales (incluye sueldos, compras y gastos que no se repiten) están en Resultado. "2 meses": se pagaron dos meses juntos. "Junto con el siguiente": ese mes no se pagó porque se pagó con el mes siguiente. El monto habitual es el valor típico de los meses anteriores. Si un gasto lleva 3 meses sin pagos se marca como terminado (ej. un crédito que se terminó de pagar) y deja de contarse.</p></section>`;
 };
 function fijoRegistrar(i){
   const f=FIJOS[i]; const r=V.fijos&&null; EDIT=null;
