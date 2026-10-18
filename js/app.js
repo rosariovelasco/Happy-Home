@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610181815';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181815';
+import * as api from './api.js?v=202610181848';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181848';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -546,7 +546,7 @@ async function guardar(c,t){
   if(nuevos.length) await api.insertar('movimientos',nuevos);
   if(F.tipo==='reembsocio'&&F.liga&&!EDIT){await api.actualizar('movimientos',F.liga,{pagado:true,fecha:base.fecha,detalle:((movById(F.liga)||{}).detalle||'')+' · devuelto con '+id}); extra.push(F.liga+' saldado');}
   toast((EDIT?'Corregido ':'Guardado ')+id+(extra.length?' + '+extra.join(', '):''));
-  EDIT=null; F={...F,prov:'',ndoc:'',monto:'',interes:'',adj:false,cuenta:'',llego:'',detalle:'',liga:'',pagado:true,edoc:''};
+  EDIT=null; F={...F,prov:'',ndoc:'',monto:'',interes:'',adj:false,cuenta:'',llego:'',detalle:'',liga:'',pagado:true,edoc:'',fecha:HOY};
   await volver();
   }catch(e){console.error(e); toast('No se pudo guardar: '+(e.message||e));}
   finally{GUARDANDO=false;}
@@ -1046,7 +1046,7 @@ function show(v){if(v==='nuevo'&&cur!=='nuevo'&&!RET) RET={v:cur,y:window.scroll
   if(v==='obras'){const f=$('#fob'); f.addEventListener('input',()=>{fob=f.value; const pos=f.selectionStart; show('obras'); const g=$('#fob'); g.focus(); g.setSelectionRange(pos,pos);});}
   if(v==='reporte') $('#repM').addEventListener('change',e=>{repM=e.target.value; show('reporte');});
 }
-$('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b){COMPACTO=false;if(b.dataset.v==='nuevo'&&!EDIT&&!F.liga){} show(b.dataset.v);}});
+$('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b){COMPACTO=false; if(b.dataset.v==='nuevo'&&!EDIT) F.fecha=HOY;if(b.dataset.v==='nuevo'&&!EDIT&&!F.liga){} show(b.dataset.v);}});
 function onClick(e){
   const a=e.target.closest('[data-act]');
   if(a){const id=a.dataset.id; e.preventDefault();
@@ -1060,8 +1060,8 @@ function onClick(e){
       'ob-reg':()=>{EDIT=null; F={...F,tipo:a.dataset.t,obra:id,prov:'',monto:'',ndoc:'',detalle:'',liga:'',cuenta:'',llego:'',pagado:true,fecha:HOY}; irNuevo(); toast('Registrando en '+((obrasAll.find(o=>o.id===id)||{}).nombre||id));},
       'obra-new':()=>obraForm(null),'obra-edit':()=>obraForm(id),'obra-save':()=>obraSave(id||null),
       'ver-tipos':()=>{$('#types').style.display=''; a.closest('.row').style.display='none';},
-      'cancel-edit':()=>{EDIT=null;F={...F,prov:'',monto:'',ndoc:'',liga:''};volver();},
-      volver:()=>{EDIT=null;F={...F,prov:'',monto:'',ndoc:'',liga:''};volver();},
+      'cancel-edit':()=>{EDIT=null;F={...F,prov:'',monto:'',ndoc:'',liga:'',fecha:HOY};volver();},
+      volver:()=>{EDIT=null;F={...F,prov:'',monto:'',ndoc:'',liga:'',fecha:HOY};volver();},
       print:()=>window.print(),
       subir:()=>toast('Por ahora mándame la cartola o el RCV y yo los cargo. La carga directa viene después.'),
       crear:()=>{const b=D.banco[+a.dataset.b];EDIT=null;F={...F,tipo:b.monto>0?'cobro':'pago',prov:b.desc.split(':').pop().trim(),monto:String(Math.abs(b.monto)),fecha:b.fecha,pagado:true,liga:''};irNuevo();}
