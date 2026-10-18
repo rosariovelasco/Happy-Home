@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610141510';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO } from './calc.js?v=202610141510';
+import * as api from './api.js?v=202610181815';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181815';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -100,13 +100,13 @@ function desgloseCobrar(){
 function abrir(t,html){$('#dlgT').innerHTML=`<h2 style="margin:0">${t}</h2>`;$('#dlgB').innerHTML=html;$('#dlg').showModal();}
 /* ---------- vistas ---------- */
 const V={};
-// retiros que cuentan desde abril: un "sueldo <mes>" de un mes anterior se paga en abril pero corresponde a ese mes
+// retiros que cuentan desde DESDE: un "sueldo <mes>" de un mes anterior al período corresponde a ese mes
 function retirosPeriodo(){
   const MS=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  return D.movs.filter(m=>{ if(m.cuenta!=='Retiro de socio'||!m.pagado||m.anulado||(m.fecha||'')<'2026-04-01') return false;
+  return D.movs.filter(m=>{ if(m.cuenta!=='Retiro de socio'||!m.pagado||m.anulado||(m.fecha||'')<DESDE) return false;
     const k=(m.detalle||'').toLowerCase().match(/sueldo\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/);
     if(!k) return true; const mi=MS.indexOf(k[1])+1, y=+m.fecha.slice(0,4)-(mi>+m.fecha.slice(5,7)?1:0);
-    return `${y}-${String(mi).padStart(2,'0')}`>='2026-04'; });
+    return `${y}-${String(mi).padStart(2,'0')}`>=DESDE.slice(0,7); });
 }
 function salud(){
   const generado=tot.mc-sum(obras.map(ccPendiente))-(tot.e+tot.f);
@@ -133,12 +133,12 @@ V.inicio=()=>{
   const SA=salud();
   const alarma=(SA.hoyo>0||libre<0)?`<section class="alarma"><div class="al-t">⚠ ${SA.hoyo>0?`Hay un hoyo de ${clp(SA.hoyo)}`:'No hay plata libre'}</div>
    <div class="al-g">
-    ${SA.hoyo>0?`<div><span>Desde abril HH ganó</span><b>${clp(SA.generado)}</b><small>margen HH − gastos generales (sin IVA)</small></div><div><span>Retiros de Max</span><b class="negc">${clp(SA.retirado)}</b><small>${clp(Math.round(SA.retirado/SA.nm))} al mes${SA.deRos?' · incluye '+clp(SA.deRos)+' de Rosario':''}</small></div><div><span>Se sacó de más</span><b class="negc">−${clp(SA.hoyo)}</b><small>salió de la plata que se le debe a CC</small></div>`:''}
+    ${SA.hoyo>0?`<div><span>Desde enero HH ganó</span><b>${clp(SA.generado)}</b><small>margen HH − gastos generales (sin IVA)</small></div><div><span>Retiros de Max</span><b class="negc">${clp(SA.retirado)}</b><small>${clp(Math.round(SA.retirado/SA.nm))} al mes${SA.deRos?' · incluye '+clp(SA.deRos)+' de Rosario':''}</small></div><div><span>Se sacó de más</span><b class="negc">−${clp(SA.hoyo)}</b><small>salió de la plata que se le debe a CC</small></div>`:''}
     <div><span>Lo que viene, por mes</span><b class="${SA.deficit<0?'negc':'pos'}">${SA.deficit<0?'−':'+'}${clp(Math.abs(SA.deficit))}</b><small>aseos ${clp(SA.aseoMes)} − gastos generales ${clp(SA.ggMes)} − cuota crédito ${clp(SA.cuota)}</small></div>
     <div><span>Proyectos en curso, hasta terminar</span><b class="${SA.unaVez<0?'negc':''}">${SA.unaVez<0?'−':'+'}${clp(Math.abs(SA.unaVez))}</b><small>para HH, una sola vez${SA.unaVez<0?': su margen ya entró y se usó':''}</small></div>
    </div>
-   <p>${SA.deficit<0?`<b>Sin proyectos nuevos, el hoyo crece ~${clp(-SA.deficit)} al mes.</b> Para no seguir cayendo hay que vender ~${clp(-SA.deficit)} de margen HH al mes. `:''}${SA.hoyo>0?'<b>No hacer retiros</b> hasta cerrar el hoyo. ':''}Primero se pagan las facturas de costos de las obras y las obligaciones (Previred, crédito, impuestos); la participación de CC, a medida que paguen los clientes. <a href="#" data-go="reparto">Ver reparto →</a></p></section>`:'';
-  return `<div><h1>Cómo va Happy Home</h1><p class="sub">Desde abril 2026 (datos cuadrados con el banco).</p></div>${alarma}
+   <p>${SA.deficit<0?`<b>Sin proyectos nuevos, el hoyo crece ~${clp(-SA.deficit)} al mes.</b> Para no seguir cayendo hay que vender ~${clp(-SA.deficit)} de margen HH al mes. `:''}${SA.hoyo>0?'<b>No hacer retiros</b> hasta cerrar el hoyo. ':''}Primero se pagan las facturas de costos de las obras y las obligaciones (Previred, crédito, impuestos); la participación de CC, a medida que paguen los clientes. <a href="#" data-go="reparto">Ver reparto →</a> · <a href="#" data-go="plata">¿Dónde se fue la plata? →</a></p></section>`:'';
+  return `<div><h1>Cómo va Happy Home</h1><p class="sub">Desde enero 2026 (datos cuadrados con el banco).</p></div>${alarma}
   <details class="card noprint" style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 18px"><summary style="cursor:pointer;font-weight:600">Qué hay en cada parte</summary><div class="grid g2" style="gap:6px 18px">
    <p class="sub" style="margin:0"><b>Obras:</b> margen de cada proyecto. Toca una para ver su ficha, sus movimientos y cerrarlo.</p>
    <p class="sub" style="margin:0"><b>Cotizar:</b> precio a partir de costos, comparado con proyectos reales. Al aprobar, crea el proyecto.</p>
@@ -150,7 +150,7 @@ V.inicio=()=>{
   </div></details>
   <section class="card"><div class="grid g4 kini">
     ${(()=>{const genHH=tot.mc-sum(obras.map(ccPendiente))-(tot.e+tot.f);
-      return `<button type="button" class="kpi kbtn" data-go="reparto"><span>Utilidad HH desde abril</span><b class="${genHH>=0&&!SA.hoyo?'pos':'negc'}">${clp(genHH)}</b><small>sin IVA · margen HH − gastos generales${SA.hoyo?`<br><strong class="negc">Se retiró ${clp(SA.retirado)}: ${clp(SA.hoyo)} más de lo ganado.</strong> Esa diferencia es plata que se le debe a CC.`:''}</small><small class="ver">Ver reparto →</small></button>`;})()}
+      return `<button type="button" class="kpi kbtn" data-go="reparto"><span>Utilidad HH desde enero</span><b class="${genHH>=0&&!SA.hoyo?'pos':'negc'}">${clp(genHH)}</b><small>sin IVA · margen HH − gastos generales${SA.hoyo?`<br><strong class="negc">Se retiró ${clp(SA.retirado)}: ${clp(SA.hoyo)} más de lo ganado.</strong> Esa diferencia es plata que se le debe a CC.`:''}</small><small class="ver">Ver reparto →</small></button>`;})()}
     <button type="button" class="kpi kbtn" data-k="libre"><span>Plata libre hoy</span><b class="${libre>=0?'pos':'negc'}">${clp(libre)}</b><small>banco ${clp(cajaTotal)} − comprometido ${clp(cajaTotal-libre)}</small><small class="ver">Ver de dónde sale →</small></button>
     <button type="button" class="kpi kbtn" data-go="reparto"><span>Se le debe a Casa Construcción</span><b>${clp(ccPend)}</b><small>participación, con IVA · ${obras.filter(o=>ccPendiente(o)>0).map(o=>esc(o.nombre.split(' (')[0])+' '+clp(ccPlata(o))).join(' · ')}</small><small class="ver">Ver reparto →</small></button>
     <button type="button" class="kpi kbtn" data-go="fijos"><span>Falta pagar este mes</span><b>${clp(pagosPend+SA.FM.falta)}</b><small>con IVA · proveedores ${clp(pagosPend)} + gastos fijos ${clp(SA.FM.falta)}</small><small class="ver">Ver gastos fijos →</small></button>
@@ -175,7 +175,7 @@ V.obras=()=>{
   return `<div><h1>Proyectos</h1><p class="sub">Margen = ventas netas − costos directos (materiales, subcontratos, fletes…). En construcción, la mitad del margen es la participación de Casa Construcción, que es costo para Happy Home. En proyectos en curso se usa el costo estimado mientras el gasto real no lo supere. Toca un proyecto para ver su ficha.</p></div>
   ${(()=>{const C_=obras.filter(o=>!o.abierta), A_=obras.filter(o=>o.abierta); const sm=(L,k)=>sum(L.map(o=>o[k]||0));
     return `<section class="card"><div class="grid g2 kini">
-    <button type="button" class="kpi kbtn" data-fobr="cerrada"><span>Margen HH · proyectos cerrados desde abril</span><b>${clp(sm(C_,'margen'))}</b><small>sin IVA · ${C_.length} proyectos · <strong>antes de CC</strong>. De eso, CC se lleva ${clp(sm(C_,'cc_parte'))} y a HH le quedan ${clp(sm(C_,'margen_hh'))}</small></button>
+    <button type="button" class="kpi kbtn" data-fobr="cerrada"><span>Margen HH · proyectos cerrados desde enero</span><b>${clp(sm(C_,'margen'))}</b><small>sin IVA · ${C_.length} proyectos · <strong>antes de CC</strong>. De eso, CC se lleva ${clp(sm(C_,'cc_parte'))} y a HH le quedan ${clp(sm(C_,'margen_hh'))}</small></button>
     <button type="button" class="kpi kbtn" data-fobr="abierta"><span>Margen HH proyectado · en curso</span><b>${clp(sm(A_,'margen'))}</b><small>sin IVA · ${A_.length} proyectos · <strong>antes de CC</strong>. De eso, CC se lleva ${clp(sm(A_,'cc_parte'))} y a HH le quedan ${clp(sm(A_,'margen_hh'))}</small></button>
     </div></section>`;})()}
   <section class="card"><label style="margin-bottom:10px">Buscar proyecto<input id="fob" value="${esc(fob)}" placeholder="Nombre, cliente o código (busca también en proyectos antiguos)"></label><div class="spread" style="margin-bottom:10px"><div class="seg">${[['','Todos'],['abierta','En curso'],['cerrada','Cerrados'],['cuadrar','Por cuadrar']].map(([k,t])=>`<button type="button" data-fobr="${k}" aria-pressed="${fobr===k}">${t} <small>${obras.filter(o=>!k||(k==='abierta'?o.abierta:k==='cerrada'?(!o.abierta&&!noCuadrada(o)):(!o.abierta&&noCuadrada(o)))).length}</small></button>`).join('')}</div><div class="row solo-ros"><button class="btn" type="button" data-act="obra-new">+ Nuevo proyecto</button><button class="btn ghost" type="button" data-go="cotizar">Desde cotización</button></div></div><div class="tbl"><table><thead><tr><th>Proyecto</th><th>Unidad</th><th>Estado</th><th class="n">Presupuesto neto</th><th class="n">Costo directo</th><th class="n">Margen proyecto</th><th class="n">%</th><th class="n">Queda para HH</th><th class="n">Queda para gastar <small>(con IVA)</small></th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
@@ -780,13 +780,73 @@ function repartoObra(o){
   if(o.un==='Construcción'){const meta=(repCC+repHH+repartible)/2; cc=Math.min(repartible,Math.max(0,Math.round(meta-repCC))); hh=repartible-cc;}
   return {o,repCC,repHH,cobrado,gastado,cajaObra,faltaGastar,faltaCobrar,necesita,colchon,repartible,cc,hh,ccIVA:Math.round(cc*1.19)};
 }
+V.plata=()=>{
+  const ms=meses;
+  const CAT_IN=[['cli','Cobros a clientes'],['rec','Reembolsos de clientes y devoluciones'],['cred','Créditos recibidos'],['oin','Otros ingresos']];
+  const CAT_OUT=[['obra','Costos de obra (materiales, mano de obra…)'],['cc','Casa Construcción · su parte del margen'],['gg','Gastos generales de HH'],['sii','SII · F29 (IVA y retenciones)'],['cuota','Cuotas de créditos'],['act','Compra de auto / activos'],['ret','Retiros de Max'],['soc','Devoluciones a socios'],['oout','Otros']];
+  const cat=m=>{ if(m.tipo==='ingreso') return m.nat==='Venta'?'cli':m.nat==='Recupero'?'rec':m.cuenta==='Crédito recibido'?'cred':'oin';
+    if(m.cuenta==='Participación CC') return 'cc'; if(m.nat==='Costo directo') return 'obra'; if(m.nat==='Estructura'||m.nat==='Financiero') return 'gg';
+    if(m.cuenta==='Pago F29 (IVA)') return 'sii'; if(m.cuenta==='Cuota de crédito') return 'cuota'; if(m.cuenta==='Compra de activo') return 'act';
+    if(m.cuenta==='Retiro de socio') return 'ret'; if(m.cuenta==='Traspaso / pagado por socios') return 'soc'; return 'oout'; };
+  const T={}; ms.forEach(mm=>T[mm]={});
+  D.movs.filter(m=>!m.anulado&&m.pagado&&m.fecha&&!NO_BANCO.includes(m.medio)&&m.cuenta!=='Traspaso entre cuentas'&&m.cuenta!=='Ajuste de apertura').forEach(m=>{const t=T[m.fecha.slice(0,7)]; if(!t) return; const k=cat(m); t[k]=(t[k]||0)+(+m.total||0);});
+  const tot=k=>sum(ms.map(mm=>T[mm][k]||0));
+  const ini=sum(Object.values((DB.saldos_banco||[]).filter(x=>x.fecha<=DESDE||x.fecha.slice(0,7)<DESDE.slice(0,7)).reduce((a,x)=>{if(!a[x.cuenta]||x.fecha>a[x.cuenta].fecha) a[x.cuenta]=x; return a;},{})).map(x=>+x.saldo));
+  const ent=mm=>sum(CAT_IN.map(([k])=>T[mm][k]||0)), sal=mm=>sum(CAT_OUT.map(([k])=>T[mm][k]||0));
+  const totIn=sum(ms.map(ent)), totOut=sum(ms.map(sal));
+  const cel=v=>`<td class="n">${v?clp(v):'<span class="sub">—</span>'}</td>`;
+  const M3=mm=>MESL[+mm.slice(5)-1].slice(0,3);
+  let acc=ini; const saldos=ms.map(mm=>{acc+=ent(mm)-sal(mm); return acc;});
+  // resultado (sin IVA)
+  const RR=ms.map(mm=>({mm,...mesTot(mm)}));
+  const ccPendNeto=sum(obras.map(ccPendiente)); const SA=salud();
+  const mcT=sum(RR.map(r=>r.mc)), eT=sum(RR.map(r=>r.e+r.f));
+  return `<div>${backBtn}<h1>¿Dónde se fue la plata?</h1><p class="sub">Desde el 1 de enero de 2026, cuadrado con las cartolas. Montos de plata con IVA, como salen del banco.</p></div>
+  ${(()=>{const util=SA.generado, ret=tot('ret'), cuo=tot('cuota'), auto=Math.max(0,tot('act')-tot('cred')); const queda=util-ret-cuo-auto;
+   return `<section class="card" style="border-left:4px solid var(--accent)"><h2>La explicación corta</h2>
+   <p style="margin:0 0 6px">Desde enero <b>HH sí ganó ${clp(util)}</b> (margen de las obras − gastos generales − lo que todavía se le debe a CC, sin IVA). Pero esa ganancia se fue en:</p>
+   <div class="tbl"><table class="pl" style="max-width:560px"><tbody>
+    <tr><td>Ganancia de HH desde enero</td><td class="n pos">${clp(util)}</td></tr>
+    <tr><td>− Retiros de Max</td><td class="n">${clp(-ret)}</td></tr>
+    <tr><td>− Cuotas de créditos (devolver lo prestado: no es gasto, pero sale plata)</td><td class="n">${clp(-cuo)}</td></tr>
+    <tr><td>− Parte del auto que no cubrió el crédito</td><td class="n">${clp(-auto)}</td></tr>
+    <tr class="tot"><td>= Lo que le quedó a HH</td><td class="n ${queda<0?'negc':'pos'}">${clp(queda)}</td></tr>
+   </tbody></table></div>
+   <p class="help" style="margin-top:6px">Por eso no hay plata libre aunque la empresa gane: todo lo que dejó se usó en retiros y en pagar los créditos. Además, los gastos generales (~${clp(Math.round(sum(RR.filter(r=>r.mm<HOY.slice(0,7)).map(r=>r.e+r.f))/Math.max(1,RR.filter(r=>r.mm<HOY.slice(0,7)).length)))} al mes) se comen buena parte del margen de las obras.</p></section>`;})()}
+  <section class="card"><h2>En resumen</h2><div class="grid g4 kini">
+   <div class="kpi"><span>Entró</span><b class="pos">${clp(totIn)}</b><small>clientes ${clp(tot('cli'))} · crédito ${clp(tot('cred'))} · reembolsos ${clp(tot('rec'))}</small></div>
+   <div class="kpi"><span>Se gastó en las obras</span><b>${clp(tot('obra')+tot('cc'))}</b><small>costos ${clp(tot('obra'))} + parte de CC ${clp(tot('cc'))}</small></div>
+   <div class="kpi"><span>Se gastó en HH</span><b>${clp(tot('gg')+tot('cuota')+tot('act')+tot('sii'))}</b><small>gastos generales ${clp(tot('gg'))} · créditos ${clp(tot('cuota'))} · auto ${clp(tot('act'))} · SII ${clp(tot('sii'))}</small></div>
+   <div class="kpi"><span>Retiró Max</span><b class="negc">${clp(tot('ret'))}</b><small>${clp(Math.round(tot('ret')/Math.max(1,ms.filter(mm=>mm<HOY.slice(0,7)).length)))} al mes en promedio</small></div>
+  </div>
+  <p class="help" style="margin-top:8px">Banco al 1 de enero: ${clp(ini)} → entró ${clp(totIn)} − salió ${clp(totOut)} = ${clp(ini+totIn-totOut)}. El IVA de los cobros no es de HH: se paga en el F29 (línea "SII").</p></section>
+
+  <section class="card"><h2>Mes a mes (plata, con IVA)</h2><div class="tbl"><table class="pl"><thead><tr><th></th>${ms.map(mm=>`<th class="n">${M3(mm)}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>
+   <tr class="tot"><td>Entró</td>${ms.map(mm=>cel(ent(mm))).join('')}${cel(totIn)}</tr>
+   ${CAT_IN.filter(([k])=>tot(k)).map(([k,t])=>`<tr><td style="padding-left:14px">${t}</td>${ms.map(mm=>cel(T[mm][k])).join('')}${cel(tot(k))}</tr>`).join('')}
+   <tr class="tot"><td>Salió</td>${ms.map(mm=>cel(sal(mm))).join('')}${cel(totOut)}</tr>
+   ${CAT_OUT.filter(([k])=>tot(k)).map(([k,t])=>`<tr><td style="padding-left:14px">${t}</td>${ms.map(mm=>cel(T[mm][k])).join('')}${cel(tot(k))}</tr>`).join('')}
+   <tr class="tot"><td>Entró − salió</td>${ms.map(mm=>`<td class="n ${ent(mm)-sal(mm)<0?'negc':'pos'}">${clp(ent(mm)-sal(mm))}</td>`).join('')}<td class="n ${totIn-totOut<0?'negc':'pos'}">${clp(totIn-totOut)}</td></tr>
+   <tr><td>Saldo en el banco (calculado)</td>${saldos.map(v=>`<td class="n">${clp(v)}</td>`).join('')}<td></td></tr>
+  </tbody></table></div></section>
+
+  <section class="card"><h2>¿Por qué no gana? (sin IVA)</h2><div class="tbl"><table class="pl"><thead><tr><th></th>${ms.map(mm=>`<th class="n">${M3(mm)}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>
+   <tr><td>Ventas</td>${RR.map(r=>cel(r.v)).join('')}${cel(sum(RR.map(r=>r.v)))}</tr>
+   <tr><td>− Costos de obra y parte de CC</td>${RR.map(r=>cel(-r.d)).join('')}${cel(-sum(RR.map(r=>r.d)))}</tr>
+   <tr class="tot"><td>= Margen que dejaron las obras</td>${RR.map(r=>cel(r.mc)).join('')}${cel(mcT)}</tr>
+   <tr><td>− Gastos generales</td>${RR.map(r=>cel(-(r.e+r.f))).join('')}${cel(-eT)}</tr>
+   <tr class="tot"><td>= Lo que ganó HH</td>${RR.map(r=>`<td class="n ${r.res<0?'negc':'pos'}">${clp(r.res)}</td>`).join('')}<td class="n ${mcT-eT<0?'negc':'pos'}">${clp(mcT-eT)}</td></tr>
+   <tr><td>Retiros de Max</td>${ms.map(mm=>cel(T[mm].ret)).join('')}${cel(tot('ret'))}</tr>
+  </tbody></table></div>
+  <p class="help" style="margin-top:8px">Por mes según la plata que entró y salió. A esto hay que restarle lo que todavía se le debe a CC (${clp(ccPendNeto)} neto), que es parte del margen pero no es de HH: así queda la utilidad real de ${clp(SA.generado)} y, con los retiros, el hoyo de ${clp(SA.hoyo)}.</p></section>`;
+};
 V.reparto=()=>{
   const L=obras.filter(o=>o.abierta&&o.pres_neto>0).map(repartoObra);
   const cerradasCC=obras.filter(o=>!o.abierta&&ccPendiente(o)>0);
   const totCCiva=sum(L.map(x=>x.ccIVA))+sum(cerradasCC.map(ccPlata)), totHH=sum(L.map(x=>x.hh));
   const paraCC=libre+ccPend; // la plata libre ya tiene apartado lo de CC
   const fila=(a,b,neg)=>`<tr><td>${a}</td><td class="n ${neg?'negc':''}">${b}</td></tr>`;
-  // ¿cuánto puedo sacar? (desde abril)
+  // ¿cuánto puedo sacar? (desde enero)
   const ccPendNeto=sum(obras.map(ccPendiente));
   const generadoHH=tot.mc-ccPendNeto-(tot.e+tot.f);
   const retirado=sum(retirosPeriodo().map(m=>m.total));
@@ -796,8 +856,8 @@ V.reparto=()=>{
   <section class="card"><div class="grid g4">
    <div class="kpi"><span>Transferir a Casa Construcción</span><b>${clp(totCCiva)}</b><small>con IVA · ${paraCC>=totCCiva?'la caja alcanza':`<span class="negc">la caja alcanza solo para ${clp(Math.max(0,paraCC))}: faltan ${clp(totCCiva-Math.max(0,paraCC))}</span>`}</small></div>
    <div class="kpi"><span>Puede sacar Happy Home</span><b class="${Math.min(totHH,libre)<=0?'negc':'pos'}">${clp(Math.max(0,Math.min(totHH,libre)))}</b><small>según las obras: ${clp(totHH)} · plata libre: ${clp(libre)}</small></div>
-   <div class="kpi"><span>Sueldo sostenible (promedio)</span><b>${clp(sueldoSost)}</b><small>al mes, con lo que ha generado HH desde abril</small></div>
-   <div class="kpi"><span>Generado vs. retirado desde abril</span><b class="${retirado>generadoHH?'negc':'pos'}">${clp(generadoHH-retirado)}</b><small>generado ${clp(generadoHH)} · retirado ${clp(retirado)}</small></div>
+   <div class="kpi"><span>Sueldo sostenible (promedio)</span><b>${clp(sueldoSost)}</b><small>al mes, con lo que ha generado HH desde enero</small></div>
+   <div class="kpi"><span>Generado vs. retirado desde enero</span><b class="${retirado>generadoHH?'negc':'pos'}">${clp(generadoHH-retirado)}</b><small>generado ${clp(generadoHH)} · retirado ${clp(retirado)}</small></div>
   </div>
   ${libre<0?`<p class="note bad"><b>Hoy no hay plata libre (${clp(libre)}).</b> Aunque los proyectos digan que hay para repartir, esa plata ya se usó en otras cosas (gastos generales, retiros de meses anteriores, otros proyectos). Se reparte cuando entren los próximos cobros.</p>`:totHH>libre?`<p class="note">Los proyectos permiten más de lo que hay en caja: el límite es la plata libre (${clp(libre)}).</p>`:''}</section>
   ${L.map(x=>`<section class="card"><div class="spread"><h2>${esc(x.o.nombre)}</h2><span class="chip ${x.o.un}">${x.o.un}</span></div>
@@ -826,10 +886,11 @@ V.reparto=()=>{
 };
 
 /* ---------- Más ---------- */
-const SUB={reparto:'Reparto del mes',fijos:'Gastos fijos',proveedores:'Proveedores',clientes:'Clientes',socios:'Socios y Casa Construcción',impuestos:'IVA y F29',conciliacion:'Conciliación con el banco',reporte:'Reporte del mes'};
+const SUB={plata:'¿Dónde se fue la plata?',reparto:'Reparto del mes',fijos:'Gastos fijos',proveedores:'Proveedores',clientes:'Clientes',socios:'Socios y Casa Construcción',impuestos:'IVA y F29',conciliacion:'Conciliación con el banco',reporte:'Reporte del mes'};
 const backBtn='<button class="back noprint" type="button" data-go="mas">← Más</button>';
 V.mas=()=>`<div><h1>Más</h1><p class="sub">Lo que no se usa todos los días.</p></div>
  <div class="hub">
+  <button type="button" data-go="plata"><b>¿Dónde se fue la plata?</b><small>Mes a mes desde enero: cuánto entró, en qué se gastó y por qué HH no gana. Para Max.</small></button>
   <button type="button" data-go="reparto"><b>Reparto del mes</b><small>Cuánto se puede repartir de cada proyecto a CC y a HH, y cuánto pueden sacar los socios de sueldo.</small></button>
   <button type="button" data-go="reporte"><b>Reporte del mes</b><small>Una página para Max: cómo fue el mes y qué viene. Se puede imprimir.</small></button>
   <button type="button" data-go="conciliacion"><b>Conciliación con el banco</b><small>Cada línea de la cartola contra la app. ${(D.banco||[]).filter(b=>b.estado!=='falta').length} de ${(D.banco||[]).length} líneas cuadradas.</small></button>
@@ -845,7 +906,7 @@ V.proveedores=()=>{
   const G={};
   D.movs.filter(m=>m.tipo==='egreso'&&['Costo directo','Estructura','Financiero'].includes(m.nat)).forEach(m=>{const k=normQ(m.quien); const g=G[k]||(G[k]={k,n:0,t:0,cu:{},ult:'',pend:0,ids:[]}); g.n++; g.t+=m.neto; g.cu[m.cuenta]=(g.cu[m.cuenta]||0)+1; if((m.fecha||'')>g.ult) g.ult=m.fecha; if(!m.pagado) g.pend+=m.total; g.ids.push(m.id);});
   const L=Object.values(G).sort((a,b)=>b.t-a.t); window._PROV=G;
-  return `<div>${backBtn}<h1>Proveedores</h1><p class="sub">Compras netas desde abril. La cuenta por defecto es la que más se ha usado: al registrar un pago, la app la propone sola.</p></div>
+  return `<div>${backBtn}<h1>Proveedores</h1><p class="sub">Compras netas desde enero. La cuenta por defecto es la que más se ha usado: al registrar un pago, la app la propone sola.</p></div>
   <section class="card"><label>Buscar<input id="fprov" value="${esc(fprov)}" placeholder="Nombre"></label><div class="tbl" style="margin-top:10px"><table><thead><tr><th>Proveedor</th><th>Cuenta por defecto</th><th class="n">Movs.</th><th class="n">Comprado (neto)</th><th>Último</th><th class="n">Por pagar</th></tr></thead><tbody id="provT">
   ${L.map(g=>`<tr class="click" data-prov="${esc(g.k)}" data-name="${esc(g.k.toLowerCase())}"><td><b>${esc(g.k)}</b></td><td><small>${esc(Object.entries(g.cu).sort((a,b)=>b[1]-a[1])[0][0])}</small></td><td class="n">${g.n}</td><td class="n">${clp(g.t)}</td><td class="num">${fdate(g.ult)}</td><td class="n ${g.pend?'negc':''}">${g.pend?clp(g.pend):'—'}</td></tr>`).join('')}
   </tbody></table></div><p class="help">Se ven nombres repetidos con distinta escritura (ej. «Casa Construccion» y «Aranda Construccion», «Sodimac» y «Sodimac Las Condes»). En la app nueva cada proveedor existe una sola vez y se elige de la lista, así no se duplica.</p></section>`;
@@ -857,7 +918,7 @@ function provDlg(k){
 V.clientes=()=>{
   const G={}; obras.forEach(o=>{const k=o.cliente||'(sin cliente)'; (G[k]=G[k]||[]).push(o);});
   const L=Object.entries(G).sort((a,b)=>sum(b[1].map(o=>o.pres_neto))-sum(a[1].map(o=>o.pres_neto)));
-  return `<div>${backBtn}<h1>Clientes</h1><p class="sub">Proyectos desde abril agrupadas por cliente.</p></div>
+  return `<div>${backBtn}<h1>Clientes</h1><p class="sub">Proyectos desde enero agrupadas por cliente.</p></div>
   <section class="card"><div class="tbl"><table><thead><tr><th>Cliente</th><th>Proyectos</th><th class="n">Vendido (neto)</th><th class="n">Margen</th><th class="n">Por cobrar</th><th class="n">No pagado</th></tr></thead><tbody>
   ${L.map(([k,os])=>`<tr><td><b>${esc(k)}</b></td><td>${os.map(o=>`<a href="#" data-obra="${o.id}">${esc(o.nombre)}</a>`).join('<br>')}</td><td class="n">${clp(sum(os.map(o=>o.pres_neto)))}</td><td class="n">${clp(sum(os.map(o=>o.margen)))}</td><td class="n">${clp(sum(os.filter(o=>o.abierta).map(o=>o.por_cobrar)))}</td><td class="n ${sum(os.map(o=>o.perdida||0))?'negc':''}">${sum(os.map(o=>o.perdida||0))?clp(sum(os.map(o=>o.perdida||0))):'—'}</td></tr>`).join('')}
   </tbody></table></div><p class="help">Arquitectura Campanil y Gellona no tienen cliente asignado en la app actual: en la nueva, el proyecto no se crea sin cliente.</p></section>`;
