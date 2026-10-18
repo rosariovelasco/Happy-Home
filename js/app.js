@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610181854';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181854';
+import * as api from './api.js?v=202610181908';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181908';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -190,7 +190,7 @@ function ficha(id){
   <div class="row solo-ros noprint"><button class="btn" type="button" data-act="ob-reg" data-t="pago" data-id="${o.id}">+ Pago / gasto de este proyecto</button><button class="btn ghost" type="button" data-act="ob-reg" data-t="cobro" data-id="${o.id}">+ Cobro al cliente</button><button class="btn ghost" type="button" data-act="ob-reg" data-t="reemb" data-id="${o.id}">+ Reembolso del cliente</button><button class="btn ghost" type="button" data-act="ob-reg" data-t="socio" data-id="${o.id}">+ Gasto pagado por socio</button></div>
   <div class="grid g4">
    <div class="kpi"><span>Presupuesto neto</span><b>${clp(o.pres_neto)}</b><small>${clp(o.pres_total)} con IVA</small></div>
-   <div class="kpi"><span>${o.abierta?'Costo anotado':'Costo directo'}</span><b>${clp(o.costo_real)}</b><small>sin IVA${o.abierta&&o.costo_est?' · de un costo estimado de '+clp(o.costo_est):''} · con IVA: pagado ${clp(o.costo_con_iva-o.por_pagar)}${o.por_pagar?' · por pagar '+clp(o.por_pagar):''} · sin CC, menos reembolsos</small></div>
+   <div class="kpi" title="Todo lo gastado en el proyecto (pagado y por pagar), sin la parte de Casa Construcción y descontando lo que el cliente reembolsó"><span>${o.abierta?'Costo a la fecha':'Costo total'}</span><b>${clp(o.costo_con_iva)}</b><small>con IVA${o.abierta&&o.costo_est?` · va en ${pct(o.costo_real/o.costo_est*100)} del tope de ${clp(Math.round(o.costo_est*1.19))}`:''}${o.por_pagar?' · de eso falta pagar '+clp(o.por_pagar):''}<br>${clp(o.costo_real)} sin IVA</small></div>
    <div class="kpi"><span>Margen ${o.abierta?'proyectado':'real'}</span><b class="${o.margen>=0?'pos':'negc'}">${clp(o.margen)}</b><small>${pct(o.margen_pct)}${o.abierta?' · presupuesto − '+(o.costo_final>o.costo_real?'costo estimado':'gastado'):''}</small></div>
    ${cc?`<div class="kpi"><span>Margen HH</span><b>${clp(o.margen-o.cc_parte)}</b><small>margen del proyecto − parte de Casa Construcción</small></div>`:`<div class="kpi"><span>Pagado por el cliente</span><b>${clp(o.cobrado_total)}</b><small>con IVA</small></div>`}
   </div>
