@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610181952';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610181952';
+import * as api from './api.js?v=202610182003';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610182003';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -21,8 +21,9 @@ const edocChip=m=>m.estado_doc==='falta'?` <span class="chip warn">${EDOC(m)}</s
 let obras=[], obrasAll=[];
 const noCuadrada=o=>!o.abierta && Math.abs(o.descuadre)>Math.max(20000,o.pres_neto*0.01);
 function ccPendiente(o){
-  if(o.un!=='Construcción'||noCuadrada(o)||o.margen<=0) return 0;
-  const share = o.abierta ? o.cc_parte*(o.pres_neto? o.cobrado_neto/o.pres_neto:0) : o.cc_parte;
+  if(o.un!=='Construcción'||noCuadrada(o)) return 0;
+  // en curso: la mitad del margen que YA entró (cobrado − gastado), no del proyectado
+  const share = o.abierta ? Math.max(0,(o.cobrado_neto-o.costo_real-(o.perdida||0))/2) : Math.max(0,o.cc_parte);
   return Math.max(0,Math.round(share-o.cc_pagado));
 }
 // plata real: lo que hay que transferir a CC (CC factura su participación: +19% IVA, que HH recupera en el F29)
@@ -70,9 +71,9 @@ async function reload(v){
 
 /* ---------- desglose de plata libre y por cobrar ---------- */
 function ccExplica(o){
-  const pc=o.pres_neto? o.cobrado_neto/o.pres_neto:0;
-  const ganado=Math.round((o.abierta?o.cc_parte*pc:o.cc_parte)*1.19);
-  return `${o.abierta?'Le corresponde por lo que ya pagó el cliente ('+pct(pc*100)+')':'Le corresponde'}: ${clp(ganado)} con IVA${o.cc_pagado_total?` − ya transferido ${clp(o.cc_pagado_total)}`:''} = ${clp(ccPlata(o))}. De eso, ${clp(ccPlata(o)-ccPendiente(o))} es IVA de su factura, que HH recupera en el F29.`;
+  const mR=o.cobrado_neto-o.costo_real-(o.perdida||0);
+  const ganado=Math.round((o.abierta?Math.max(0,mR/2):o.cc_parte)*1.19);
+  return `${o.abierta?'Le corresponde la mitad del margen que ya entró ('+clp(mR)+' neto = cobrado − gastado)':'Le corresponde'}: ${clp(ganado)} con IVA${o.cc_pagado_total?` − ya transferido ${clp(o.cc_pagado_total)}`:''} = ${clp(ccPlata(o))}. De eso, ${clp(ccPlata(o)-ccPendiente(o))} es IVA de su factura, que HH recupera en el F29.`;
 }
 function desgloseLibre(){
   const ccObras=obras.filter(o=>ccPendiente(o)>0);
@@ -117,17 +118,22 @@ function salud(){
   const hoyo=Math.max(0,retirado-generado);
   // lo que viene (base caja, igual que "generado"): proyectos en curso una vez + aseos al mes − gastos generales y cuotas
   const abiertos=obras.filter(o=>o.abierta&&o.pres_neto>0);
-  const unaVez=Math.round(sum(abiertos.map(o=>{const r=repartoObra(o); const pc=o.pres_neto?o.cobrado_neto/o.pres_neto:0; return (r.faltaCobrar-r.faltaGastar)-(o.un==='Construcción'?o.cc_parte*(1-pc):0);}))
+  const unaVez=Math.round(sum(abiertos.map(o=>{const r=repartoObra(o); const mF=r.faltaCobrar-r.faltaGastar; return mF-(o.un==='Construcción'?mF/2:0);}))
     +sum(D.movs.filter(m=>!m.anulado&&!m.pagado&&m.nat==='Recupero').map(m=>+m.neto||0))-sum(D.movs.filter(m=>!m.anulado&&!m.pagado&&m.nat==='Costo directo'&&m.cuenta!=='Participación CC').map(m=>+m.neto||0)));
   const aseoMes=Math.round(sum(abiertos.filter(o=>o.un==='Aseo').map(o=>o.pres_neto-(o.costo_est||o.costo_real))));
   const FM=fijosMes(); const ggMes=C.estructura_prom, cuota=FM.cuota;
   const deficit=aseoMes-ggMes-cuota;
-  return {generado,retirado,deRos,nm,porMes,hoyo,unaVez,aseoMes,ggMes,cuota,deficit,FM};
+  // ¿se la podrá quedar? caja libre sin las reservas de proyectos + lo que entra neto de los proyectos (ya descontado CC e IVA)
+  const recPend=sum(D.movs.filter(m=>!m.anulado&&!m.pagado&&m.nat==='Recupero').map(m=>+m.total||0));
+  const futCaja=Math.round(sum(abiertos.map(o=>{const r=repartoObra(o); const mF=r.faltaCobrar-r.faltaGastar; return mF-(o.un==="Construcción"?mF/2:0);})));
+  const libreBase=libre+proyNec+proyCol;
+  const alTerminar=libreBase+futCaja+recPend;
+  return {libreBase,futCaja,recPend,alTerminar,generado,retirado,deRos,nm,porMes,hoyo,unaVez,aseoMes,ggMes,cuota,deficit,FM};
 }
 V.inicio=()=>{
   const alerts=[];
   obras.filter(noCuadrada).forEach(o=>alerts.push(`<li><span class="chip bad">Por cuadrar</span><span><b>${esc(o.nombre)}</b>: la diferencia entre presupuesto y lo pagado por el cliente es de ${clp(o.descuadre)} neto. No se puede cerrar hasta cobrarlo o declararlo como no pagado.</span></li>`));
-  obras.filter(o=>ccPendiente(o)>0).forEach(o=>alerts.push(`<li><span class="chip warn">Casa Construcción</span><span><b>${esc(o.nombre)}</b>: le faltan por transferir ${clp(ccPlata(o))} (con IVA) de participación${o.abierta?' sobre lo que ya pagó el cliente (estimado)':''}.</span></li>`));
+  obras.filter(o=>ccPendiente(o)>0).forEach(o=>alerts.push(`<li><span class="chip warn">Casa Construcción</span><span><b>${esc(o.nombre)}</b>: le faltan por transferir ${clp(ccPlata(o))} (con IVA) de participación${o.abierta?' sobre el margen que ya entró':''}.</span></li>`));
   C.pend_pagos.forEach(p=>alerts.push(`<li><span class="chip warn">Por pagar</span><span><b>${esc(p.quien)}</b> ${clp(p.total)} · ${esc(p.obra)} · ${fdate(p.fecha)}</span></li>`));
   const open=obras.filter(o=>o.abierta);
   const SA=salud();
@@ -135,9 +141,10 @@ V.inicio=()=>{
    <div class="al-g">
     ${SA.hoyo>0?`<div><span>Desde enero HH ganó <i class="tg si">sin IVA</i></span><b>${clp(SA.generado)}</b><small>margen HH − gastos generales (sin IVA)</small></div><div><span>Retiros de Max <i class="tg ci">con IVA</i></span><b class="negc">${clp(SA.retirado)}</b><small>${clp(Math.round(SA.retirado/SA.nm))} al mes${SA.deRos?' · incluye '+clp(SA.deRos)+' de Rosario':''}</small></div><div><span>Se sacó de más <i class="tg si">sin IVA</i></span><b class="negc">−${clp(SA.hoyo)}</b><small>salió de la plata que se le debe a CC</small></div>`:''}
     <div><span>Si no entran proyectos nuevos, cada mes HH ${SA.deficit<0?'pierde':'gana'}</span><b class="${SA.deficit<0?'negc':'pos'}">${clp(Math.abs(SA.deficit))}</b><small>entra: margen de los aseos ${clp(SA.aseoMes)} · sale: gastos generales ${clp(SA.ggMes)} + cuota del auto ${clp(SA.cuota)}</small></div>
-    <div><span>Proyectos en curso, hasta terminar <i class="tg si">sin IVA</i></span><b class="${SA.unaVez<0?'negc':''}">${SA.unaVez<0?'−':'+'}${clp(Math.abs(SA.unaVez))}</b><small>para HH, una sola vez${SA.unaVez<0?': su margen ya entró y se usó':''}</small></div>
+    <div><span>Ganancia de HH que falta entrar <i class="tg si">sin IVA</i></span><b class="${SA.unaVez<0?'negc':''}">${SA.unaVez<0?'−':'+'}${clp(Math.abs(SA.unaVez))}</b><small>de los proyectos en curso: lo que falta cobrar − lo que falta gastar − la mitad para CC. Es plata que todavía no entra, por eso no está en la utilidad.</small></div>
+    <div><span>¿HH se la podrá quedar?</span><b class="${SA.alTerminar<0?'negc':'pos'}">${SA.alTerminar<=0?'No':'Solo '+clp(SA.alTerminar)}</b><small>${SA.libreBase<0?`Hoy faltan ${clp(-SA.libreBase)} en caja para cubrir lo que ya se debe (CC, IVA, cuentas por pagar y 1 mes de gastos generales). Lo que falta entrar primero tapa eso. `:''}${SA.recPend?`Más ${clp(SA.recPend)} de reembolsos que deben clientes. `:''}Al terminar los proyectos quedarían <b>${clp(SA.alTerminar)}</b> libres, sin contar los gastos generales de los meses que duren (~${clp(SA.ggMes)} al mes).</small></div>
    </div>
-   <p>${SA.deficit<0?`<b>Sin proyectos nuevos, el hoyo crece ~${clp(-SA.deficit)} al mes.</b> Para no seguir cayendo hay que vender ~${clp(-SA.deficit)} de margen HH al mes. `:''}${SA.hoyo>0?'<b>No hacer retiros</b> hasta cerrar el hoyo. ':''}Primero se pagan las facturas de costos de las obras y las obligaciones (Previred, crédito, impuestos); la participación de CC, a medida que paguen los clientes. <a href="#" data-go="reparto">Ver reparto →</a> · <a href="#" data-go="plata">¿Dónde se fue la plata? →</a></p></section>`:'';
+   <p>${SA.deficit<0?`<b>Sin proyectos nuevos, el hoyo crece ~${clp(-SA.deficit)} al mes.</b> Para no seguir cayendo hay que vender ~${clp(-SA.deficit)} de margen HH al mes. `:''}${SA.hoyo>0?'<b>No hacer retiros</b> hasta cerrar el hoyo. ':''}Primero se pagan las facturas de costos de las obras y las obligaciones (Previred, crédito, impuestos); la participación de CC queda reservada y se le paga cuando haya caja. <a href="#" data-go="reparto">Ver reparto →</a> · <a href="#" data-go="plata">¿Dónde se fue la plata? →</a></p></section>`:'';
   return `<div><h1>Cómo va Happy Home</h1><p class="sub">Desde enero 2026 (datos cuadrados con el banco).</p><p class="leer"><b>Cómo leer:</b> la plata (banco, por cobrar, por pagar, CC) se muestra <i class="tg ci">con IVA</i>, como en el banco. La ganancia y los márgenes, <i class="tg si">sin IVA</i>, porque el IVA es del SII.</p></div>${alarma}
   <details class="card noprint" style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 18px"><summary style="cursor:pointer;font-weight:600">Qué hay en cada parte</summary><div class="grid g2" style="gap:6px 18px">
    <p class="sub" style="margin:0"><b>Obras:</b> margen de cada proyecto. Toca una para ver su ficha, sus movimientos y cerrarlo.</p>
@@ -197,17 +204,17 @@ function ficha(id){
   </div>
   ${noCuadrada(o)?`<p class="note bad"><b>No cuadra:</b> faltan ${clp(o.descuadre)} netos entre el presupuesto y lo pagado por el cliente. Para cerrarlo hay que registrar el pago que falta o declararlo como "monto no pagado por el cliente".</p>`:''}
   ${o.abierta&&o.costo_est&&o.pres_neto?(()=>{const r=repartoObra(o); const ccT=cc?Math.round(o.margen_pres/2):0;
-    const vR=o.cobrado_neto, cR=o.costo_real, mR=vR-cR, ccR=o.cc_pagado||0, hhR=mR-ccR;
-    const vF=r.faltaCobrar, cF=r.faltaGastar, mF=vF-cF, mFin=mR+mF, ccFin=cc?Math.round(mFin/2):0, ccF=ccFin-ccR, hhF=mF-ccF;
+    const vR=o.cobrado_neto, cR=o.costo_real, mR=vR-cR, ccR=o.cc_pagado||0, ccD=cc?Math.max(0,Math.round(mR/2)):0, hhR=mR-ccD;
+    const vF=r.faltaCobrar, cF=r.faltaGastar, mF=vF-cF, ccF=cc?Math.round(mF/2):0, hhF=mF-ccF;
     const td=(v)=>`<td class="n ${v<0?'negc':''}">${clp(v)}</td>`;
     const fila=(t,a,b,c,sub)=>`<tr><td>${t}${sub?`<br><small class="sub" style="margin:0">${sub}</small>`:''}</td>${td(a)}${td(b)}${td(c)}${td(b+c)}</tr>`;
     return `<div><h3>Presupuestado vs real a la fecha <i class="tg si">sin IVA</i></h3><div class="tbl"><table class="pl"><thead><tr><th></th><th class="n">Presupuestado</th><th class="n">Real a la fecha</th><th class="n">Lo que falta</th><th class="n" title="real a la fecha + lo que falta">Final proyectado</th></tr></thead><tbody>
     ${fila('Venta (cliente)',o.pres_neto,vR,vF,`falta que pague el cliente: ${clp(Math.round(vF*1.19))} con IVA`)}
     ${fila('− Costo de la obra',-o.costo_est,-cR,-cF,`máximo para terminar: ${clp(Math.round(cF*1.19))} con IVA${o.costo_proy?' (según lo que dijo la obra)':' sin perder ganancia'}`)}
     ${fila('<b>= Margen del proyecto</b>',o.margen_pres,mR,mF,'')}
-    ${cc?fila('− Parte de Casa Construcción (50%)',-ccT,-ccR,-ccF,`real a la fecha = lo ya pagado a CC · falta pagarle ${clp(Math.round(ccF*1.19))} con IVA`):''}
-    ${fila('<b>= Para HH</b>',o.margen_pres-ccT,hhR,hhF,'real a la fecha = margen que ya entró en caja y HH ya tiene o usó'+(r.repHH?` (incluye ${clp(r.repHH)} de retiros de socio cargados a este proyecto)`:''))}
-    </tbody></table></div>${hhF<0?`<p class="note bad">HH ya usó ${clp(-hhF)} más de lo que le corresponde en este proyecto: lo que falta cobrar no alcanza para terminar y pagarle a CC.</p>`:''}</div>`;})():''}
+    ${cc?fila('− Parte de Casa Construcción (50%)',-ccT,-ccD,-ccF,`a la fecha le corresponde la mitad de lo que ya entró: pagado ${clp(Math.round(ccR*1.19))} · se le debe ${clp(Math.round(Math.max(0,ccD-ccR)*1.19))} con IVA`):''}
+    ${fila('<b>= Para HH</b>',o.margen_pres-ccT,hhR,hhF,'real a la fecha = la parte de HH del margen que ya entró'+(r.repHH?` · de este proyecto ya se retiraron ${clp(r.repHH)}`:''))}
+    </tbody></table></div></div>`;})():''}
   <div><h3>Cobro al cliente</h3><div class="bar"><i style="width:${cob}%"></i></div><div class="spread"><small class="num">${clp(o.cobrado_total)} pagado por el cliente</small><small class="num">${o.abierta?clp(o.por_cobrar)+' por cobrar':''}</small></div></div>
   ${o.abierta?(()=>{const tope=o.costo_est||0; const pend=sum(D.movs.filter(m=>m.obra_id===o.id&&!m.pagado&&m.nat==='Costo directo').map(m=>m.neto)); const disp=tope-o.costo_real; const r=repartoObra(o);
     if(!tope) return `<div class="note">Este proyecto no tiene costo estimado, así que no se puede calcular cuánto queda para gastar. Ponlo en <b>Editar datos del proyecto</b> (o el margen que quieren ganar).</div>`;
@@ -228,13 +235,13 @@ function ficha(id){
    <tr class="tot"><td>Costo directo</td><td class="n">${clp(o.costo_real)}</td></tr>
    ${o.perdida?`<tr><td>Monto no pagado por el cliente</td><td class="n negc">${clp(o.perdida)}</td></tr>`:''}
   </tbody></table></div>
-  ${cc?(()=>{const pc=o.pres_neto?o.cobrado_neto/o.pres_neto:0; const gan=o.abierta?Math.round(o.cc_parte*pc):o.cc_parte; return `<div class="tbl"><table><thead><tr><th>Casa Construcción (50% del margen)</th><th class="n">Sin IVA</th><th class="n">Plata real (con IVA)</th></tr></thead><tbody>
+  ${cc?(()=>{const mRc=o.cobrado_neto-o.costo_real-(o.perdida||0); const gan=o.abierta?Math.max(0,Math.round(mRc/2)):o.cc_parte; return `<div class="tbl"><table><thead><tr><th>Casa Construcción (50% del margen)</th><th class="n">Sin IVA</th><th class="n">Plata real (con IVA)</th></tr></thead><tbody>
     <tr><td>Participación total ${o.abierta?'proyectada':''}</td><td class="n">${clp(o.cc_parte)}</td><td class="n">${clp(o.cc_parte*1.19)}</td></tr>
-    ${o.abierta?`<tr><td>Le corresponde por lo que ya pagó el cliente (${pct(pc*100)})</td><td class="n">${clp(gan)}</td><td class="n">${clp(gan*1.19)}</td></tr>`:''}
+    ${o.abierta?`<tr><td>Le corresponde a la fecha <small>(mitad del margen que ya entró: ${clp(mRc)})</small></td><td class="n">${clp(gan)}</td><td class="n">${clp(gan*1.19)}</td></tr>`:''}
     <tr><td>Ya transferido</td><td class="n">${clp(o.cc_pagado)}</td><td class="n">${clp(o.cc_pagado_total)}</td></tr>
-    <tr class="tot"><td>Falta transferir${o.abierta?' (estimado)':''}</td><td class="n">${clp(ccPendiente(o))}</td><td class="n">${clp(ccPlata(o))}</td></tr></tbody></table></div><p class="help">CC factura su participación: de lo que le transfieres, el IVA lo recupera HH en el F29.</p>`;})():''}
+    <tr class="tot"><td>Falta transferir${o.abierta?' (a la fecha)':''}</td><td class="n">${clp(ccPendiente(o))}</td><td class="n">${clp(ccPlata(o))}</td></tr></tbody></table></div><p class="help">CC factura su participación: de lo que le transfieres, el IVA lo recupera HH en el F29.</p>`;})():''}
   <div><h3>Movimientos de este proyecto</h3><div class="tbl"><table><thead><tr><th>Fecha</th><th>Quién</th><th>Qué es</th><th class="n">Monto</th></tr></thead><tbody>
-   ${D.movs.filter(m=>m.obra_n===o.nombre).map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td>${esc(m.quien)}${m.detalle?`<br><small class="sub">${esc(m.detalle.slice(0,50))}</small>`:''}</td><td><span class="chip ${m.nat==='Venta'?'open':''}">${esc(CTA(m.cuenta))}</span>${!m.pagado?' <span class="chip warn">Pendiente</span>':''}</td><td class="n ${m.tipo==='ingreso'?'pos':''}">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</td></tr>`).join('')||'<tr><td colspan="4">Sin movimientos desde abril.</td></tr>'}
+   ${D.movs.filter(m=>m.obra_n===o.nombre).map(m=>`<tr data-mov="${m.id}"><td class="num">${fdate(m.fecha)}</td><td>${esc(m.quien)}${m.detalle?`<br><small class="sub">${esc(m.detalle.slice(0,50))}</small>`:''}</td><td><span class="chip ${m.nat==='Venta'?'open':''}">${esc(CTA(m.cuenta))}</span>${!m.pagado?' <span class="chip warn">Pendiente</span>':''}</td><td class="n ${m.tipo==='ingreso'?'pos':''}">${m.tipo==='ingreso'?'+':'−'}${clp(m.total)}</td></tr>`).join('')||'<tr><td colspan="4">Sin movimientos desde enero.</td></tr>'}
   </tbody></table></div><p class="help">Verde y con + : plata que entró. Con − : plata que salió. Incluye todo el historial del proyecto.</p></div>
   ${o.cierre?`<div><h3>Cierre</h3><p class="sub" style="margin:0">${o.cierre.q?o.cierre.q+' '+esc(o.cierre.u)+' · '+clp(o.pres_neto/o.cierre.q)+' por '+esc(o.cierre.u)+' · ':''}${o.cierre.dias?o.cierre.dias+' días · ':''}${esc(o.cierre.apr||'')}</p></div>`:''}
   <div class="row solo-ros"><button class="btn ghost" type="button" data-act="obra-edit" data-id="${o.id}">Editar datos del proyecto</button>${o.un==='Aseo'?`<button class="btn ghost" type="button" data-act="mes-sig" data-id="${o.id}">Crear el mes siguiente</button>`:''}</div>
