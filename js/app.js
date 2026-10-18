@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610182042';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610182042';
+import * as api from './api.js?v=202610182046';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE } from './calc.js?v=202610182046';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -411,12 +411,17 @@ V.fijos=()=>{
   const grp=r=>r.f.impuesto?'imp':r.f.cuenta==='Cuota de crédito'?'cred':'emp';
   const pagadoMes=sum(activos.map(r=>r.por[mesAct]||0)), esperadoMes=sum(activos.filter(r=>!r.f.impuesto).map(r=>r.tipico));
   const empMes=sum(activos.filter(r=>grp(r)==='emp').map(r=>r.tipico)), credMes=sum(activos.filter(r=>grp(r)==='cred').map(r=>r.tipico));
+  const msC=ms.filter(mm=>mm<mesAct); const ggTot=sum(D.movs.filter(m=>m.pagado&&m.tipo==='egreso'&&['Estructura','Financiero'].includes(m.nat)&&m.fecha&&msC.includes(m.fecha.slice(0,7))).map(m=>m.total));
+  const ggMesT=msC.length?Math.round(ggTot/msC.length):0, otrosMes=Math.max(0,ggMesT-empMes), totalMes=empMes+otrosMes+credMes;
   const faltan=activos.filter(r=>!r.f.impuesto&&!(r.por[mesAct]>0));
   return `<div>${backBtn}<h1>Gastos fijos</h1><p class="sub">Los pagos que se repiten todos los meses. La app los reconoce por palabra clave en el nombre o el detalle del movimiento.</p></div>
   <section class="card"><div class="grid g4">
-   <div class="kpi"><span>Gastos fijos de la empresa <i class="tg ci">con IVA</i></span><b>${clp(empMes)}</b><small>al mes · contador, Previred, teléfono, bencina, TAG, seguro, banco…</small></div>
-   <div class="kpi"><span>Cuotas de créditos <i class="tg ci">con IVA</i></span><b>${clp(credMes)}</b><small>al mes · ${esc(activos.filter(r=>grp(r)==='cred').map(r=>r.f.n).join(', ')||'ninguna')}. No es gasto: es pagar una deuda</small></div>
-   <div class="kpi"><span>Total que sale al mes</span><b>${clp(esperadoMes)}</b><small>empresa + cuotas, sin el F29 (IVA)</small></div>
+   <div class="kpi"><span>1. Gastos fijos de la empresa <i class="tg ci">con IVA</i></span><b>${clp(empMes)}</b><small>se repiten todos los meses: contador, Previred, teléfono, bencina, TAG, seguro, banco (la lista de abajo)</small></div>
+   <div class="kpi"><span>2. Otros gastos de la empresa <i class="tg ci">con IVA</i></span><b>${clp(otrosMes)}</b><small>no se repiten: compras, honorarios extra, web, ads… (promedio de ${msC.length} meses)</small></div>
+   <div class="kpi"><span>3. Cuota del crédito <i class="tg ci">con IVA</i></span><b>${clp(credMes)}</b><small>${esc(activos.filter(r=>grp(r)==='cred').map(r=>r.f.n).join(', ')||'ninguna')}: pago de deuda</small></div>
+   <div class="kpi" style="border:2px solid var(--line-strong,#999)"><span><b style="font-size:inherit">Total que sale al mes (1+2+3)</b></span><b class="negc">${clp(totalMes)}</b><small>lo que HH necesita ganar cada mes para no perder plata, sin contar retiros ni el F29</small></div>
+  </div></section>
+  <section class="card"><div class="grid g4">
    <div class="kpi"><span>Pagado este mes (${MESL[+mesAct.slice(5)-1]})</span><b>${clp(pagadoMes)}</b></div>
    <div class="kpi"><span>Faltan este mes</span><b class="${faltan.length?'negc':''}">${faltan.length}</b><small>${esc(faltan.map(r=>r.f.n).join(', ')||'nada')}</small></div>
   </div></section>
