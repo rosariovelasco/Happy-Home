@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610281735';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE, fechaDoc, ivaDebito, ivaCredito, CONSTRUCTORAS, COND_TIPOS, parteCons } from './calc.js?v=202610281735';
+import * as api from './api.js?v=202610281800';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE, fechaDoc, ivaDebito, ivaCredito, CONSTRUCTORAS, COND_TIPOS, parteCons } from './calc.js?v=202610281800';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -140,6 +140,7 @@ function salud(){
 V.inicio=()=>{
   const alerts=[];
   obras.filter(noCuadrada).forEach(o=>alerts.push(`<li><span class="chip bad">Por cuadrar</span><span><b>${esc(o.nombre)}</b>: la diferencia entre presupuesto y lo pagado por el cliente es de ${clp(o.descuadre)} neto. No se puede cerrar hasta cobrarlo o declararlo como no pagado.</span></li>`));
+  obrasAll.filter(o=>o.abierta&&!(+o.pres_total)).forEach(o=>alerts.push(`<li><span class="chip bad">Falta presupuesto</span><span><b>${esc(o.nombre)}</b>: no tiene presupuesto ni costo presupuestado. Sin eso, lo que paga el cliente${o.cobrado_total?` (ya pagó ${clp(o.cobrado_total)})`:''} no se ve en por cobrar, margen ni reparto. Ponlo en la ficha → Editar datos del proyecto.</span></li>`));
   obrasAll.filter(o=>o.abierta&&o.cons&&!o.cons.ok).forEach(o=>alerts.push(`<li><span class="chip bad">Falta condición</span><span><b>${esc(o.nombre)}</b>: ${o.cons.sin?'falta elegir la constructora':'falta poner la condición acordada con '+esc(o.cons.nombre)}. Mientras no esté, la app no le calcula participación (el margen HH aparece completo). Ponla en la ficha → Editar datos del proyecto.</span></li>`));
   obras.filter(o=>ccPendiente(o)>0).forEach(o=>alerts.push(`<li><span class="chip warn">${esc(consN(o))}</span><span><b>${esc(o.nombre)}</b>: le faltan por transferir ${clp(ccPlata(o))} (con IVA) de participación${o.abierta?' sobre el margen que ya entró':''}.</span></li>`));
   C.pend_pagos.forEach(p=>alerts.push(`<li><span class="chip warn">Por pagar</span><span><b>${esc(p.quien)}</b> ${clp(p.total)} · ${esc(p.obra)} · ${fdate(p.fecha)}</span></li>`));
@@ -210,6 +211,7 @@ function ficha(id){
   <div class="row solo-ros noprint"><button class="btn" type="button" data-act="ob-reg" data-t="pago" data-id="${o.id}">+ Pago / gasto de este proyecto</button><button class="btn ghost" type="button" data-act="ob-reg" data-t="cobro" data-id="${o.id}">+ Cobro al cliente</button><button class="btn ghost" type="button" data-act="ob-reg" data-t="reemb" data-id="${o.id}">+ Reembolso del cliente</button><button class="btn ghost" type="button" data-act="ob-reg" data-t="socio" data-id="${o.id}">+ Gasto pagado por socio</button></div>
   <div class="grid g4">
    <div class="kpi"><span>Presupuesto neto <i class="tg si">sin IVA</i></span><b>${clp(o.pres_neto)}</b><small>${clp(o.pres_total)} con IVA</small></div>
+   ${o.abierta&&!(+o.pres_total)?`<p class="note bad" style="grid-column:1/-1"><b>Falta el presupuesto y el costo presupuestado.</b> Sin eso la app no puede calcular margen, por cobrar ni reparto${o.cobrado_total?`: el cliente ya pagó ${clp(o.cobrado_total)} y solo se ve en la barra de cobro y en los movimientos`:''}. <button class="x solo-ros" type="button" data-act="obra-edit" data-id="${o.id}">Ponerlo ahora</button></p>`:''}
    ${o.cons&&!o.cons.ok?`<p class="note bad" style="grid-column:1/-1"><b>${o.cons.sin?'Falta elegir la constructora':'Falta la condición acordada con '+esc(o.cons.nombre)}.</b> Mientras no esté, no se le calcula participación y el margen HH aparece completo. <button class="x solo-ros" type="button" data-act="obra-edit" data-id="${o.id}">Ponerla ahora</button></p>`:''}
    <div class="kpi" title="Todo lo gastado en el proyecto (pagado y por pagar), sin la parte de la constructora y descontando lo que el cliente reembolsó"><span>${o.abierta?'Costo hasta hoy':'Costo total'} <i class="tg ci">con IVA</i></span><b>${clp(o.costo_con_iva)}</b><small>con IVA${o.abierta&&o.costo_est?` · va en ${pct(o.costo_real/o.costo_est*100)} del tope de ${clp(Math.round(o.costo_est*1.19))}`:''}${o.por_pagar?' · de eso falta pagar '+clp(o.por_pagar):''}<br>${clp(o.costo_real)} sin IVA</small></div>
    <div class="kpi" title="Lo que se esperaba ganar al cotizar: presupuesto − costo presupuestado. No cambia con el avance de la obra."><span>Margen presupuestado <i class="tg si">sin IVA</i></span><b>${o.margen_pres==null?'—':clp(o.margen_pres)}</b><small>${o.margen_pres==null?'falta el costo presupuestado':pct(o.margen_pres_pct)+' · presupuesto − costo presupuestado ('+clp(o.costo_est)+')'}</small></div>
@@ -458,6 +460,7 @@ const TIPOS=[
  {k:'f29',t:'Pago F29',d:'IVA mensual al SII'},
  {k:'cuota',t:'Cuota de crédito',d:'Auto, Fogape: capital + interés'},
  {k:'traspaso',t:'Traspaso entre cuentas',d:'Entre cuentas HH o la reserva'},
+ {k:'otroing',t:'Otro ingreso / por aclarar',d:'Entró plata y no es cobro, reembolso ni devolución (o aún no sabes qué es)',obra:'opt'},
 ];
 let F={tipo:'pago',prov:'',obra:'',doc:'Factura',ndoc:'',fdoc:'',monto:'',medio:'Cuenta 159-46332-07',fecha:HOY,socio:'Rosario',interes:'',adj:false,cuenta:'',pagado:true,llego:'',detalle:'',liga:''};
 const obrasSelF=()=>obras.filter(o=>o.abierta).concat(obras.filter(o=>!o.abierta));
@@ -472,6 +475,7 @@ function formHTML(){
   let h='';
   if(t.prov) h+=`<label>Proveedor<input id="f_prov" list="provs" value="${esc(F.prov)}" placeholder="Ej: Sodimac, Glendy Puyosa"><datalist id="provs">${provs.map(p=>`<option value="${esc(p)}">`).join('')}</datalist></label>`;
   if(t.k==='cobro'||t.k==='reemb'||t.k==='nopago') h+=`<label>Cliente<input id="f_prov" value="${esc(F.prov)}" placeholder="Se toma de la obra"></label>`;
+  if(t.k==='otroing') h+=`<label>De quién<input id="f_prov" value="${esc(F.prov)}" placeholder="Ej: José Donoso"></label>`;
   if(t.k==='retiro'||t.k==='socio'||t.k==='reembsocio') h+=`<label>Socio<select id="f_socio">${['Rosario','Max'].map(s=>`<option ${F.socio===s?'selected':''}>${s}</option>`).join('')}</select></label>`;
   if(t.prov) h+=`<label>Cuenta<select id="f_cuenta">${['','Materiales','Subcontrato / mano de obra','Arriendo equipos y herramientas','Fletes y traslados','Retiro de escombros','Viáticos','Participación CC','Comisión de cobro','Comisiones e intereses','Remuneraciones y honorarios','Teléfono e internet','Vehículo y traslados','Marketing','Patentes y permisos','Otros gastos generales'].map(c=>`<option ${F.cuenta===c?'selected':''} value="${c}">${CTA(c)||'(la sugiere el proveedor)'}</option>`).join('')}</select></label>`;
   if(t.obra) h+=`<label>${t.k==='retiro'?'De qué proyecto <small>(opcional: para el reparto)</small>':'Proyecto'+(t.obra==='req'?'':' <small>(obligatoria si es costo de proyecto)</small>')}<select id="f_obra"><option value="">${t.obra==='req'?'Elige la obra':'General HH (sin proyecto)'}</option>${obrasSelF().map(o=>`<option value="${o.id}" ${F.obra===o.id?'selected':''}>${esc(o.nombre)}${o.abierta?'':' (cerrado)'}</option>`).join('')}</select></label>`;
@@ -485,7 +489,7 @@ function formHTML(){
   if(t.k==='cobro') h+=`<label>Monto pagado por el cliente <small>(lo que llegó; si es menos, la diferencia es comisión)</small><input id="f_llego" inputmode="numeric" value="${esc(F.llego)}" placeholder="Igual al monto"></label>`;
   if(t.k==='reembsocio'){const dd=D.movs.filter(m=>m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso'&&!m.pagado&&m.id!==EDIT); h+=`<label>Qué se le devuelve<select id="f_liga"><option value="">—</option>${dd.map(m=>`<option value="${m.id}" ${F.liga===m.id?'selected':''}>${esc(m.quien)} ${clp(m.total)} · ${esc((m.detalle||'').slice(0,50))}</option>`).join('')}</select></label>`;}
   if(['pago','cobro','reemb','f29'].includes(t.k)) h+=`<label>Estado<select id="f_pag"><option value="1" ${F.pagado?'selected':''}>Pagado</option><option value="0" ${!F.pagado?'selected':''}>Pendiente de pago</option></select></label>`;
-  if(t.k!=='nopago'&&t.k!=='socio') h+=`<label>${t.k==='cobro'||t.k==='reemb'||t.k==='devol'?'Entra a':'Pagado con'}<select id="f_medio">${MEDIOS.map(m=>`<option ${F.medio===m?'selected':''}>${m}</option>`).join('')}</select></label>`;
+  if(t.k!=='nopago'&&t.k!=='socio') h+=`<label>${t.k==='cobro'||t.k==='reemb'||t.k==='devol'||t.k==='otroing'?'Entra a':'Pagado con'}<select id="f_medio">${MEDIOS.map(m=>`<option ${F.medio===m?'selected':''}>${m}</option>`).join('')}</select></label>`;
   h+=`<label>Fecha<input id="f_fecha" type="date" value="${F.fecha}"></label><label>Detalle<input id="f_det" value="${esc(F.detalle)}" placeholder="Opcional"></label>`;
   h+=`<label>Respaldo (foto o PDF)<input id="f_adj" type="file" accept="image/*,application/pdf"></label>`;
   $('#fm').innerHTML=h; bindForm(); effects();
@@ -561,6 +565,7 @@ function effects(){
    case 'f29': rows.push(r('Resultado','no afecta (el IVA no es costo)'),r('Caja','sale '+clp(c.M))); break;
    case 'cuota': rows.push(r('Capital (no afecta resultado)',clp(c.M-c.interes)),r('Intereses (gasto financiero)',clp(c.interes)),r('Caja','sale '+clp(c.M))); break;
    case 'traspaso': rows.push(r('Resultado','no afecta'),r('Caja total','no cambia')); break;
+   case 'otroing': rows.push(r('Resultado','no afecta (no es venta ni baja costos)'),r('Margen del proyecto','no cambia'),r('Caja','entra '+clp(c.M))); W.push('<p class="note">Queda como «Ingreso por aclarar». Cuando sepas qué es, ábrelo en Movimientos → Corregir y cámbialo al tipo que corresponda. Anota en el detalle lo que sepas.</p>'); break;
   }
   $('#eff').innerHTML=rows.join('');
   if(['pago','socio','cobro'].includes(c.t)&&F.doc==='Nada'&&!F.adj&&c.M) W.push('<p class="note">Sin documento: adjunta una foto o PDF del respaldo. Si no, queda marcado como "sin respaldo".</p>');
@@ -569,12 +574,12 @@ function effects(){
   if(c.M){const sim=D.movs.find(m=>m.total===c.M&&(m.quien||'').toLowerCase()===F.prov.toLowerCase().trim()); if(sim&&!(F.ndoc&&String(sim.ndoc)===String(F.ndoc))) W.push(`<p class="note">Ya hay un movimiento de ${esc(sim.quien)} por el mismo monto (${fdate(sim.fecha)}). Revisa que no sea el mismo.</p>`);}
   $('#warns').innerHTML=W.join('');
 }
-const NAT_T={cobro:['Venta','Cobro a cliente'],reemb:['Recupero','Reembolso de cliente'],devol:['Recupero','Devolución de proveedor'],nopago:['Pérdida','Monto no pagado por cliente'],retiro:['No afecta','Retiro de socio'],f29:['No afecta','Pago F29 (IVA)'],cuota:['No afecta','Cuota de crédito'],traspaso:['No afecta','Traspaso entre cuentas'],reembsocio:['No afecta','Traspaso / pagado por socios']};
+const NAT_T={cobro:['Venta','Cobro a cliente'],reemb:['Recupero','Reembolso de cliente'],devol:['Recupero','Devolución de proveedor'],nopago:['Pérdida','Monto no pagado por cliente'],retiro:['No afecta','Retiro de socio'],f29:['No afecta','Pago F29 (IVA)'],cuota:['No afecta','Cuota de crédito'],traspaso:['No afecta','Traspaso entre cuentas'],otroing:['No afecta','Ingreso por aclarar'],reembsocio:['No afecta','Traspaso / pagado por socios']};
 let GUARDANDO=false;
 async function guardar(c,t){
   if(GUARDANDO) return; GUARDANDO=true; $('#save')&&($('#save').disabled=true);
   try{
-  const ing=['cobro','reemb','devol'].includes(F.tipo);
+  const ing=['cobro','reemb','devol','otroing'].includes(F.tipo);
   const [nat,cuenta]=NAT_T[F.tipo]||[c.nat,c.cuenta];
   const pag=['pago','cobro','reemb','f29'].includes(F.tipo)?F.pagado:(F.tipo!=='socio');
   const unO=c.o?c.o.un:null;
@@ -674,7 +679,7 @@ let EDIT=null;
 function editarMov(id){
   const m=movById(id); if(!m) return; EDIT=id;
   const o=obraDe(m);
-  F={...F,socio:/max/i.test(m.quien||'')?'Max':'Rosario',tipo:m.medio==='Cuenta personal socio'&&m.tipo==='egreso'?'socio':(m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso')?'reembsocio':m.cuenta==='Devolución de proveedor'?'devol':TIPO_DE[m.nat]||(m.cuenta==='Retiro de socio'?'retiro':m.cuenta==='Pago F29 (IVA)'?'f29':m.cuenta==='Cuota de crédito'?'cuota':'traspaso'),prov:m.quien||'',obra:o?o.id:'',doc:['Nada','Factura','Boleta','Boleta de honorarios'].includes(m.doc)?m.doc:'Nada',ret:'hh',edoc:m.estado_doc||'',ndoc:m.ndoc||'',fdoc:m.fecha_doc||((m.tipo==='ingreso'&&['falta','por_emitir'].includes(m.estado_doc))?HOY:(m.fecha||'')),monto:String(m.total),fecha:m.fecha||HOY,cuenta:F.tipo==='pago'?'':'',pagado:m.pagado,llego:'',medio:m.medio||F.medio,detalle:m.detalle||'',liga:m.liga||''};
+  F={...F,socio:/max/i.test(m.quien||'')?'Max':'Rosario',tipo:m.medio==='Cuenta personal socio'&&m.tipo==='egreso'?'socio':(m.cuenta==='Traspaso / pagado por socios'&&m.tipo==='egreso')?'reembsocio':m.cuenta==='Devolución de proveedor'?'devol':m.cuenta==='Ingreso por aclarar'?'otroing':TIPO_DE[m.nat]||(m.cuenta==='Retiro de socio'?'retiro':m.cuenta==='Pago F29 (IVA)'?'f29':m.cuenta==='Cuota de crédito'?'cuota':'traspaso'),prov:m.quien||'',obra:o?o.id:'',doc:['Nada','Factura','Boleta','Boleta de honorarios'].includes(m.doc)?m.doc:'Nada',ret:'hh',edoc:m.estado_doc||'',ndoc:m.ndoc||'',fdoc:m.fecha_doc||((m.tipo==='ingreso'&&['falta','por_emitir'].includes(m.estado_doc))?HOY:(m.fecha||'')),monto:String(m.total),fecha:m.fecha||HOY,cuenta:F.tipo==='pago'?'':'',pagado:m.pagado,llego:'',medio:m.medio||F.medio,detalle:m.detalle||'',liga:m.liga||''};
   if(['pago','socio'].includes(F.tipo)){F.cuenta=m.cuenta; F.cuentaAuto=false;}
   irNuevo();
 }

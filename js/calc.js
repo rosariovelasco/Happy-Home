@@ -6,7 +6,8 @@ export const DESDE = '2026-01-01'; // inicio de los datos limpios (cuadrados con
 
 const r0 = v => Math.round(v || 0);
 // Fecha de la factura: define el mes del IVA. Si el dato no existe (datos antiguos/demo) se usa la fecha del movimiento.
-export const fechaDoc = m => (('fecha_doc' in m) ? (m.fecha_doc || '') : (m.fecha || ''));
+// Sin fecha de factura: un ingreso cuya factura aún no se envía no cuenta (su IVA entra cuando se marque enviada); todo lo demás usa la fecha del movimiento.
+export const fechaDoc = m => m.fecha_doc || ((m.tipo === 'ingreso' && ['falta', 'por_emitir'].includes(m.estado_doc)) ? '' : (m.fecha || ''));
 export const ivaDebito = m => m.tipo === 'ingreso' && (m.nat === 'Venta' || (m.nat === 'Recupero' && m.cuenta === 'Reembolso de cliente'));
 export const ivaCredito = m => m.tipo === 'egreso' && ['Costo directo', 'Estructura', 'Financiero'].includes(m.nat);
 
