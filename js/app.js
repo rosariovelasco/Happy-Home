@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610281500';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE, fechaDoc, ivaDebito, ivaCredito, CONSTRUCTORAS, COND_TIPOS, parteCons } from './calc.js?v=202610281500';
+import * as api from './api.js?v=202610281720';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE, fechaDoc, ivaDebito, ivaCredito, CONSTRUCTORAS, COND_TIPOS, parteCons } from './calc.js?v=202610281720';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -473,7 +473,7 @@ function formHTML(){
   if(t.prov) h+=`<label>Proveedor<input id="f_prov" list="provs" value="${esc(F.prov)}" placeholder="Ej: Sodimac, Glendy Puyosa"><datalist id="provs">${provs.map(p=>`<option value="${esc(p)}">`).join('')}</datalist></label>`;
   if(t.k==='cobro'||t.k==='reemb'||t.k==='nopago') h+=`<label>Cliente<input id="f_prov" value="${esc(F.prov)}" placeholder="Se toma de la obra"></label>`;
   if(t.k==='retiro'||t.k==='socio'||t.k==='reembsocio') h+=`<label>Socio<select id="f_socio">${['Rosario','Max'].map(s=>`<option ${F.socio===s?'selected':''}>${s}</option>`).join('')}</select></label>`;
-  if(t.prov) h+=`<label>Cuenta<select id="f_cuenta">${['','Materiales','Subcontrato / mano de obra','Arriendo equipos y herramientas','Fletes y traslados','Retiro de escombros','Viáticos','Participación CC','Comisión de cobro','Remuneraciones y honorarios','Teléfono e internet','Vehículo y traslados','Marketing','Patentes y permisos','Otros gastos generales'].map(c=>`<option ${F.cuenta===c?'selected':''} value="${c}">${CTA(c)||'(la sugiere el proveedor)'}</option>`).join('')}</select></label>`;
+  if(t.prov) h+=`<label>Cuenta<select id="f_cuenta">${['','Materiales','Subcontrato / mano de obra','Arriendo equipos y herramientas','Fletes y traslados','Retiro de escombros','Viáticos','Participación CC','Comisión de cobro','Comisiones e intereses','Remuneraciones y honorarios','Teléfono e internet','Vehículo y traslados','Marketing','Patentes y permisos','Otros gastos generales'].map(c=>`<option ${F.cuenta===c?'selected':''} value="${c}">${CTA(c)||'(la sugiere el proveedor)'}</option>`).join('')}</select></label>`;
   if(t.obra) h+=`<label>${t.k==='retiro'?'De qué proyecto <small>(opcional: para el reparto)</small>':'Proyecto'+(t.obra==='req'?'':' <small>(obligatoria si es costo de proyecto)</small>')}<select id="f_obra"><option value="">${t.obra==='req'?'Elige la obra':'General HH (sin proyecto)'}</option>${obrasSelF().map(o=>`<option value="${o.id}" ${F.obra===o.id?'selected':''}>${esc(o.nombre)}${o.abierta?'':' (cerrado)'}</option>`).join('')}</select></label>`;
   if(t.doc) h+=`<label>Documento<select id="f_doc">${['Factura','Boleta','Boleta de honorarios','Nada'].map(d=>`<option ${F.doc===d?'selected':''}>${d}</option>`).join('')}</select></label><label>N° documento<input id="f_ndoc" value="${esc(F.ndoc)}" inputmode="numeric"></label>`;
   if((t.doc&&F.doc==='Factura')||(t.k==='reemb'&&reembFact())) h+=`<label>Fecha de la factura <small>(define el mes del IVA; si no la pones, se usa la fecha del movimiento)</small><input id="f_fdoc" type="date" value="${esc(F.fdoc||'')}"></label>`;
@@ -508,7 +508,7 @@ const titleCase=s=>s.trim().toLowerCase().replace(/\b\p{L}/gu,c=>c.toUpperCase()
 function calc(){
   const t=F.tipo, M=+String(F.monto).replace(/\D/g,'')||0; const o=obras.find(x=>x.id===F.obra);
   const p=D.proveedores[titleCase(F.prov)];
-  let cuenta=F.cuenta||(p?p.cuenta:''); let nat=F.cuenta?(['Remuneraciones y honorarios','Teléfono e internet','Vehículo y traslados','Marketing','Patentes y permisos','Otros gastos generales'].includes(F.cuenta)?'Estructura':'Costo directo'):(p?p.nat:'');
+  let cuenta=F.cuenta||(p?p.cuenta:''); let nat=F.cuenta==='Comisiones e intereses'?'Financiero':F.cuenta?(['Remuneraciones y honorarios','Teléfono e internet','Vehículo y traslados','Marketing','Patentes y permisos','Otros gastos generales'].includes(F.cuenta)?'Estructura':'Costo directo'):(p?p.nat:'');
   // «General HH (sin proyecto)» manda: si la cuenta quedó como costo de proyecto porque la sugirió el historial
   // del proveedor, o porque el proveedor es un gasto fijo conocido (TAG, bencina, seguro auto…), pasa a gasto general.
   if((t==='pago'||t==='socio')&&!F.obra&&nat==='Costo directo'){
@@ -611,7 +611,7 @@ function toast(msg){document.querySelectorAll('.toast').forEach(x=>x.remove());c
    cotizador, proveedores, clientes, socios, impuestos,
    conciliación y reporte para Max
    ========================================================= */
-const CTA=c=>c==='Participación CC'?'Reparto constructora (CC, José Donoso…)':c;
+const CTA=c=>c==='Participación CC'?'Reparto constructora (CC, José Donoso…)':c==='Comisión de cobro'?'Comisión de cobro (Transbank, de un proyecto)':c==='Comisiones e intereses'?'Comisiones e intereses (banco, sin proyecto)':c;
 const isMax=()=>!ME||ME.rol!=='admin';
 const movById=id=>D.movs.find(m=>m.id===id);
 const obraDe=m=>obrasAll.find(o=>o.id===m.obra_id);
