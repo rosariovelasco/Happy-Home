@@ -5,6 +5,30 @@ export const NO_BANCO = ['TC de la casa', 'Cuenta personal socio', 'Pagado en el
 export const DESDE = '2026-01-01'; // inicio de los datos limpios (cuadrados con el banco)
 
 const r0 = v => Math.round(v || 0);
+// Fecha de la factura: define el mes del IVA. Si el dato no existe (datos antiguos/demo) se usa la fecha del movimiento.
+export const fechaDoc = m => (('fecha_doc' in m) ? (m.fecha_doc || '') : (m.fecha || ''));
+export const ivaDebito = m => m.tipo === 'ingreso' && (m.nat === 'Venta' || (m.nat === 'Recupero' && m.cuenta === 'Reembolso de cliente'));
+export const ivaCredito = m => m.tipo === 'egreso' && ['Costo directo', 'Estructura', 'Financiero'].includes(m.nat);
+
+// ---------- constructora del proyecto y condición acordada ----------
+// Los proyectos antiguos quedaron guardados como Casa Construcción, 50% del margen (la regla de siempre). Desde Rododenros se elige en cada proyecto.
+// Sin constructora o sin condición: la app no le calcula participación y avisa.
+export const CONSTRUCTORAS = ['Casa Construcción', 'José Donoso'];
+export const COND_TIPOS = { margen: '% del margen', venta: '% de la venta neta', fijo: 'Monto fijo (neto, sin IVA)' };
+export function condCons(o) {
+  if (!o || o.un !== 'Construcción') return null;
+  if (!o.constructora) return { nombre: 'Sin constructora', tipo: null, valor: null, ok: false, sin: true };
+  const tipo = COND_TIPOS[o.cond_tipo] ? o.cond_tipo : null;
+  const valor = (o.cond_valor === null || o.cond_valor === undefined || o.cond_valor === '') ? null : +o.cond_valor;
+  return { nombre: o.constructora, tipo, valor, ok: !!tipo && valor !== null && !isNaN(valor) };
+}
+// Parte de la constructora (neto) sobre un margen y una venta. frac = qué fracción del presupuesto representa esa venta (solo para monto fijo).
+export function parteCons(c, margen, venta, frac) {
+  if (!c || !c.ok) return 0;
+  if (c.tipo === 'margen') return margen * c.valor / 100;
+  if (c.tipo === 'venta') return venta * c.valor / 100;
+  return c.valor * Math.max(0, Math.min(1, frac));
+}
 
 export function calcObras(obrasDB, movs) {
   const by = {};
@@ -43,9 +67,10 @@ export function calcObras(obrasDB, movs) {
       margen = base_ing - costoN;
       costo_final = costoN;
     }
-    const cc = o.un === 'Construcción' ? Math.round(margen / 2) : 0;
+    const cons = condCons(o);
+    const cc = cons ? Math.round(parteCons(cons, margen, base_ing, 1)) : 0;
     out.push({
-      ...o, id: o.id, nombre: o.nombre, un: o.un, cliente: o.cliente, abierta, inicio: o.inicio, ult,
+      ...o, cons, id: o.id, nombre: o.nombre, un: o.un, cliente: o.cliente, abierta, inicio: o.inicio, ult,
       pres_neto: r0(o.pres_neto), pres_total: r0(o.pres_total), costo_est: r0(o.costo_est),
       cobrado_neto: r0(cobrado_neto), cobrado_total: r0(cobrado_total),
       por_cobrar: abierta ? r0(Math.max(0, o.pres_total - cobrado_total)) : r0(por_cobrar_mov),
@@ -104,8 +129,10 @@ export function calcCaja(movs, saldos, obras, R, meses, hoy) {
   const d = new Date(hoy + 'T12:00:00'); d.setMonth(d.getMonth() - 1);
   const mesAnt = d.toISOString().slice(0, 7);
   const enMes = (m, mm) => (m.fecha || '').startsWith(mm) && !m.anulado;
-  const iva_debito = movs.filter(m => enMes(m, mesAnt) && m.nat === 'Venta' && m.pagado).reduce((a, m) => a + (+m.iva || 0), 0);
-  const iva_credito = movs.filter(m => enMes(m, mesAnt) && m.tipo === 'egreso' && ['Costo directo', 'Estructura', 'Financiero'].includes(m.nat)).reduce((a, m) => a + (+m.iva || 0), 0);
+  // IVA: se declara en el mes de la factura (fecha_doc), no cuando se paga
+  const enMesDoc = (m, mm) => fechaDoc(m).startsWith(mm) && !m.anulado;
+  const iva_debito = movs.filter(m => enMesDoc(m, mesAnt) && ivaDebito(m)).reduce((a, m) => a + (+m.iva || 0), 0);
+  const iva_credito = movs.filter(m => enMesDoc(m, mesAnt) && ivaCredito(m)).reduce((a, m) => a + (+m.iva || 0), 0);
   const f29_pagado = movs.filter(m => enMes(m, mesAct) && m.cuenta === 'Pago F29 (IVA)' && m.pagado).reduce((a, m) => a + (+m.total || 0), 0);
   const obraN = id => (obras.find(o => o.id === id) || {}).nombre || 'General';
   const pend_pagos = movs.filter(m => !m.anulado && m.tipo === 'egreso' && !m.pagado && m.nat !== 'Pérdida')

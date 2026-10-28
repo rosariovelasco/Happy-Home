@@ -58,7 +58,14 @@ create table if not exists movimientos (
   modificado_en timestamptz
 );
 create index if not exists mov_fecha on movimientos(fecha);
+-- fecha de la factura: define el mes del IVA (la fecha del movimiento cambia al marcarlo pagado). Agregada 2026-10-20.
+alter table movimientos add column if not exists fecha_doc date;
 create index if not exists mov_obra on movimientos(obra_id);
+-- constructora de cada proyecto de construcción y condición acordada. Agregada 2026-10-28.
+-- Los proyectos anteriores quedaron como Casa Construcción, 50% del margen (la regla de siempre). Rododenros (HH-2026-054) en adelante se elige.
+alter table obras add column if not exists constructora text;
+alter table obras add column if not exists cond_tipo text check (cond_tipo in ('margen','venta','fijo'));
+alter table obras add column if not exists cond_valor numeric;
 
 -- historial: cada corrección guarda la versión anterior
 create table if not exists movimientos_historial (
