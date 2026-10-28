@@ -1,5 +1,5 @@
-import * as api from './api.js?v=202610281720';
-import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE, fechaDoc, ivaDebito, ivaCredito, CONSTRUCTORAS, COND_TIPOS, parteCons } from './calc.js?v=202610281720';
+import * as api from './api.js?v=202610281735';
+import { calcObras, calcResultado, calcCaja, catalogoProveedores, mesesHasta, NO_BANCO, DESDE, fechaDoc, ivaDebito, ivaCredito, CONSTRUCTORAS, COND_TIPOS, parteCons } from './calc.js?v=202610281735';
 const HOY=(()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})();
 let DB=null, ME=null;
 const D={movs:[],obras:[],resultado:{},meses:[],caja:{},proveedores:{},banco:[]};
@@ -373,7 +373,7 @@ const FIJOS=[
  {n:'TAG',k:['tag','autopista'],cuenta:'Vehículo y traslados',tambienObra:true},
  {n:'Bencina',k:['shell','copec','bencina'],cuenta:'Vehículo y traslados'},
  {n:'Seguro auto',k:['seguro auto','bci seguros','seguro bci','pac bci'],cuenta:'Vehículo y traslados',tambienObra:true},
- {n:'Comisión banco',k:['comision','comisión'],cuenta:'Comisiones e intereses',soloNat:['Financiero']},
+ {n:'Comisión banco',k:['comision','comisión','pyme','banco chile','banco de chile'],no:['interes','desgravamen','impuesto',' lc '],cuenta:'Comisiones e intereses',soloNat:['Financiero']},
  {n:'Seguro banco (desgravamen)',k:['desgravamen'],cuenta:'Comisiones e intereses'},
  {n:'YouTube',k:['youtube'],cuenta:'Marketing'},
  {n:'Crédito auto',k:['credito auto','crédito auto'],cuenta:'Cuota de crédito',noafecta:true},
@@ -384,7 +384,7 @@ const nrm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 function fijoDe(m){
   if(m.tipo!=='egreso'||!['Estructura','Financiero','No afecta','Costo directo'].includes(m.nat)) return null;
   const t=' '+nrm((m.quien||'')+' '+(m.detalle||''))+' ';
-  return FIJOS.find(f=>(m.nat!=='Costo directo'||f.tambienObra)&&(!f.soloNat||f.soloNat.includes(m.nat))&&(!f.noafecta||m.nat==='No afecta')&&(f.noafecta||m.nat!=='No afecta')&&f.k.some(k=>new RegExp('(^|[^a-z])'+nrm(k)+'([^a-z]|$)').test(t)))||null;
+  return FIJOS.find(f=>(m.nat!=='Costo directo'||f.tambienObra)&&(!f.soloNat||f.soloNat.includes(m.nat))&&(!f.noafecta||m.nat==='No afecta')&&(f.noafecta||m.nat!=='No afecta')&&!(f.no&&f.no.some(k=>t.includes(nrm(k))))&&f.k.some(k=>new RegExp('(^|[^a-z])'+nrm(k)+'([^a-z]|$)').test(t)))||null;
 }
 const esFijo=m=>!!fijoDe(m);
 function fijosMes(){
