@@ -58,7 +58,13 @@ export function calcObras(obrasDB, movs) {
     const abierta = o.estado === 'en_curso';
     const costoN = costo - recupero;
     let base_ing, costo_final, margen;
-    if (abierta) {
+    const sin_pres = abierta && !(+o.pres_neto);
+    if (sin_pres) {
+      // en curso y sin presupuesto: mientras se pone, se calcula con lo cobrado al cliente hasta hoy
+      base_ing = cobrado_neto + Math.round(por_cobrar_mov / 1.19);
+      costo_final = costoN;
+      margen = base_ing - costoN - perdida;
+    } else if (abierta) {
       base_ing = +o.pres_neto;
       const proy = +o.costo_proy || 0;
       costo_final = proy ? Math.max(proy, costoN) : (+o.costo_est ? Math.max(+o.costo_est, costoN) : costoN);
@@ -71,10 +77,10 @@ export function calcObras(obrasDB, movs) {
     const cons = condCons(o);
     const cc = cons ? Math.round(parteCons(cons, margen, base_ing, 1)) : 0;
     out.push({
-      ...o, cons, id: o.id, nombre: o.nombre, un: o.un, cliente: o.cliente, abierta, inicio: o.inicio, ult,
+      ...o, cons, sin_pres, id: o.id, nombre: o.nombre, un: o.un, cliente: o.cliente, abierta, inicio: o.inicio, ult,
       pres_neto: r0(o.pres_neto), pres_total: r0(o.pres_total), costo_est: r0(o.costo_est),
       cobrado_neto: r0(cobrado_neto), cobrado_total: r0(cobrado_total),
-      por_cobrar: abierta ? r0(Math.max(0, o.pres_total - cobrado_total)) : r0(por_cobrar_mov),
+      por_cobrar: abierta && !sin_pres ? r0(Math.max(0, o.pres_total - cobrado_total)) : r0(por_cobrar_mov),
       costo_real: r0(costoN), costo_final: r0(costo_final), perdida: r0(perdida), margen: r0(margen),
       margen_pres: +o.costo_est && +o.pres_neto ? r0(o.pres_neto - o.costo_est) : null,
       margen_pres_pct: +o.costo_est && +o.pres_neto ? Math.round((o.pres_neto - o.costo_est) / o.pres_neto * 1000) / 10 : null,
